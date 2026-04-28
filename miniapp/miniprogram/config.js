@@ -1,0 +1,3 @@
+module.exports = {
+  WEB_APP_URL: "https://your-domain.com"
+};

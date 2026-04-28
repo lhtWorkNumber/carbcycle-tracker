@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="brand">
+    <view class="mark">C</view>
+    <view>
+      <view class="eyebrow">CarbCycle Tracker</view>
+      <view class="title">碳循环追踪</view>
+    </view>
+  </view>
+
+  <view class="panel">
+    <view class="panel-title">微信入口已就绪</view>
+    <view class="panel-copy">打开线上 H5 后即可继续使用记录、计划、统计和设置等核心流程。</view>
+
+    <button class="primary" bindtap="openWebview" disabled="{{!canOpen}}">
+      打开应用
+    </button>
+
+    <view wx:if="{{!canOpen}}" class="notice">
+      请先在 miniprogram/config.js 中配置正式 HTTPS 域名。
+    </view>
+  </view>
+</view>

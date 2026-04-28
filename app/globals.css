@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 138 33% 98%;
+    --foreground: 145 26% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 145 26% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 145 26% 15%;
+    --primary: 149 61% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 28% 94%;
+    --secondary-foreground: 145 26% 18%;
+    --muted: 140 18% 93%;
+    --muted-foreground: 145 10% 42%;
+    --accent: 141 46% 90%;
+    --accent-foreground: 145 26% 18%;
+    --destructive: 0 71% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 140 18% 88%;
+    --input: 140 18% 88%;
+    --ring: 149 61% 39%;
+    --radius: 1.25rem;
+  }
+
+  .dark {
+    --background: 150 11% 10%;
+    --foreground: 138 21% 93%;
+    --card: 150 10% 14%;
+    --card-foreground: 138 21% 93%;
+    --popover: 150 10% 14%;
+    --popover-foreground: 138 21% 93%;
+    --primary: 149 47% 54%;
+    --primary-foreground: 150 15% 10%;
+    --secondary: 149 8% 18%;
+    --secondary-foreground: 138 21% 93%;
+    --muted: 149 8% 18%;
+    --muted-foreground: 141 11% 68%;
+    --accent: 149 17% 20%;
+    --accent-foreground: 138 21% 93%;
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 149 8% 22%;
+    --input: 149 8% 22%;
+    --ring: 149 47% 54%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-background;
+  }
+
+  body {
+    font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(circle at top left, rgba(22, 163, 74, 0.08), transparent 24%),
+      radial-gradient(circle at bottom right, rgba(134, 239, 172, 0.08), transparent 20%);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  @keyframes water-wave {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes water-swell {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(3px);
+    }
+  }
+
+  .app-surface {
+    @apply border border-white/70 bg-white/85 shadow-[0_18px_60px_rgba(17,24,39,0.06)] backdrop-blur-xl dark:border-white/5 dark:bg-white/5 dark:shadow-none;
+  }
+
+  .subtle-grid {
+    background-image:
+      linear-gradient(to right, rgba(16, 185, 129, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(16, 185, 129, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .safe-px {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .water-wave {
+    animation: water-wave 4.6s linear infinite, water-swell 2.4s ease-in-out infinite;
+  }
+
+  .water-wave-slow {
+    animation: water-wave 7.4s linear infinite reverse, water-swell 3.1s ease-in-out infinite;
+  }
+}

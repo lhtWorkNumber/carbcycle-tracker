@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+}
+
+enum Goal {
+  CUT
+  MAINTAIN
+  BULK
+}
+
+enum FoodCategory {
+  STAPLE
+  MEAT
+  VEGETABLE
+  FRUIT
+  DAIRY
+  SNACK
+  BEVERAGE
+  OTHER
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum DayType {
+  HIGH_CARB
+  MEDIUM_CARB
+  LOW_CARB
+  REST
+}
+
+enum ExerciseType {
+  STRENGTH
+  CARDIO
+  HIIT
+  FLEXIBILITY
+}
+
+model User {
+  id                  Int            @id @default(autoincrement())
+  auth_user_id        String?        @unique
+  email               String?
+  name                String
+  gender              Gender
+  age                 Int
+  height              Float
+  weight              Float
+  body_fat_percentage Float?
+  training_days_json  String?
+  activity_level      ActivityLevel
+  goal                Goal
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+  meal_logs           MealLog[]
+  daily_plans         DailyPlan[]
+  body_records        BodyRecord[]
+  exercise_logs       ExerciseLog[]
+  meal_templates      MealTemplate[]
+  water_logs          WaterLog[]
+  weekly_summaries    WeeklySummary[]
+  achievement_progress AchievementProgress[]
+}
+
+model FoodItem {
+  id                Int          @id @default(autoincrement())
+  name              String
+  name_zh           String
+  category          FoodCategory
+  calories_per_100g Float
+  protein_per_100g  Float
+  fat_per_100g      Float
+  carbs_per_100g    Float
+  fiber_per_100g    Float
+  gi_index          Float?
+  image_url         String?
+  is_custom         Boolean      @default(false)
+  meal_logs         MealLog[]
+  meal_template_items MealTemplateItem[]
+
+  @@unique([name, name_zh])
+}
+
+model MealLog {
+  id             Int      @id @default(autoincrement())
+  user_id        Int
+  food_item_id   Int
+  meal_type      MealType
+  quantity_grams Float
+  date           DateTime
+  created_at     DateTime @default(now())
+  user           User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  food_item      FoodItem @relation(fields: [food_item_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, date])
+  @@index([food_item_id, date])
+}
+
+model DailyPlan {
+  id               Int      @id @default(autoincrement())
+  user_id          Int
+  date             DateTime
+  day_type         DayType
+  target_calories  Float
+  target_protein_g Float
+  target_fat_g     Float
+  target_carbs_g   Float
+  actual_calories  Float    @default(0)
+  actual_protein_g Float    @default(0)
+  actual_fat_g     Float    @default(0)
+  actual_carbs_g   Float    @default(0)
+  user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, date])
+  @@index([date])
+}
+
+model BodyRecord {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int
+  date                DateTime
+  weight              Float
+  body_fat_percentage Float?
+  waist_cm            Float?
+  note                String?
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, date])
+}
+
+model ExerciseLog {
+  id               Int          @id @default(autoincrement())
+  user_id          Int
+  date             DateTime
+  exercise_name    String
+  duration_minutes Int
+  calories_burned  Float
+  exercise_type    ExerciseType
+  user             User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, date])
+}
+
+model MealTemplate {
+  id               Int                @id @default(autoincrement())
+  user_id          Int
+  name             String
+  meal_type        MealType
+  day_types_json   String?
+  built_in         Boolean            @default(false)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime           @updatedAt
+  user             User               @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  items            MealTemplateItem[]
+
+  @@index([user_id, meal_type])
+}
+
+model MealTemplateItem {
+  id               Int           @id @default(autoincrement())
+  meal_template_id Int
+  food_item_id     Int?
+  name             String
+  name_zh          String
+  category         FoodCategory
+  quantity_grams   Float
+  calories         Float
+  protein          Float
+  fat              Float
+  carbs            Float
+  fiber            Float
+  meal_template    MealTemplate  @relation(fields: [meal_template_id], references: [id], onDelete: Cascade)
+  food_item        FoodItem?     @relation(fields: [food_item_id], references: [id], onDelete: SetNull)
+
+  @@index([meal_template_id])
+}
+
+model WaterLog {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  date         DateTime
+  target_ml    Int
+  amount_ml    Int
+  entries_json String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, date])
+  @@index([user_id, date])
+}
+
+model WeeklySummary {
+  id                   Int      @id @default(autoincrement())
+  user_id              Int
+  week_key             String
+  week_label           String
+  adherence_rate       Float
+  weight_change        Float
+  calorie_average      Float
+  protein_average      Float
+  fat_average          Float
+  carbs_average        Float
+  comparison_json      String?
+  motivational_message String
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+  user                 User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, week_key])
+  @@index([user_id, week_key])
+}
+
+model AchievementProgress {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  key         String
+  title       String
+  description String
+  unlocked    Boolean  @default(false)
+  unlocked_at DateTime?
+  progress    Float
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, key])
+  @@index([user_id, key])
+}
