@@ -1,10 +1,10 @@
 import { FoodCategory, type FoodItemSummary } from "@/lib/domain";
 
 export const loginVisualImage =
-  "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1400&q=80";
+  "/visuals/photo-1490645935967-10de6ba17061.jpg";
 
 export const onboardingVisualImage =
-  "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1400&q=80";
+  "/visuals/photo-1512621776951-a57141f2eefd.jpg";
 
 export interface FoodVisualMeta {
   symbol: string;
@@ -19,253 +19,253 @@ const curatedImageRules: Array<{
   {
     keywords: ["无糖豆浆", "豆浆", "soy milk"],
     imageUrl:
-      "https://images.unsplash.com/photo-1555465083-a845797ef750?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1555465083-a845797ef750.jpg"
   },
   {
     keywords: ["绿茶", "green tea"],
     imageUrl:
-      "https://images.unsplash.com/photo-1641997827830-12fa1d1a238d?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1641997827830-12fa1d1a238d.jpg"
   },
   {
     keywords: ["黑咖啡", "coffee"],
     imageUrl:
-      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1495474472287-4d71bcdd2085.jpg"
   },
   {
     keywords: ["馒头", "steamed bun"],
     imageUrl:
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1509440159596-0249088772ff.jpg"
   },
   {
     keywords: ["鸡胸肉", "chicken breast"],
     imageUrl:
-      "https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1604503468506-a8da13d82791.jpg"
   },
   {
     keywords: ["牛肉", "lean beef", "beef"],
     imageUrl:
-      "https://images.unsplash.com/photo-1603048297172-c92544798d5a?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1603048297172-c92544798d5a.jpg"
   },
   {
     keywords: ["里脊肉", "pork tenderloin", "鸭胸肉", "duck breast"],
     imageUrl:
-      "https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1529692236671-f1f6cf9683ba.jpg"
   },
   {
     keywords: ["三文鱼", "salmon"],
     imageUrl:
-      "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1519708227418-c8fd9a32b7a2.jpg"
   },
   {
     keywords: ["鳕鱼", "cod", "金枪鱼", "tuna"],
     imageUrl:
-      "https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1519708227418-c8fd9a32b7a2.jpg"
   },
   {
     keywords: ["虾", "shrimp"],
     imageUrl:
-      "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1565680018434-b513d5e5fd47.jpg"
   },
   {
     keywords: ["豆腐", "tofu"],
     imageUrl:
-      "https://images.unsplash.com/photo-1544519685-86ccb2dab444?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1544519685-86ccb2dab444.jpg"
   },
   {
     keywords: ["牛油果", "avocado"],
     imageUrl:
-      "https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1523049673857-eb18f1d7b578.jpg"
   },
   {
     keywords: ["苹果", "apple"],
     imageUrl:
-      "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1560806887-1e4cd0b6cbd6.jpg"
   },
   {
     keywords: ["香蕉", "banana"],
     imageUrl:
-      "https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1528825871115-3581a5387919.jpg"
   },
   {
     keywords: ["蓝莓", "blueberry"],
     imageUrl:
-      "https://images.unsplash.com/photo-1498557850523-fd3d118b962e?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1498557850523-fd3d118b962e.jpg"
   },
   {
     keywords: ["草莓", "strawberry"],
     imageUrl:
-      "https://images.unsplash.com/photo-1464965911861-746a04b4bca6?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1464965911861-746a04b4bca6.jpg"
   },
   {
     keywords: ["橙子", "orange"],
     imageUrl:
-      "https://images.unsplash.com/photo-1547514701-42782101795e?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1547514701-42782101795e.jpg"
   },
   {
     keywords: ["猕猴桃", "kiwi"],
     imageUrl:
-      "https://images.unsplash.com/photo-1585059895524-72359e06133a?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1585059895524-72359e06133a.jpg"
   },
   {
     keywords: ["西柚", "grapefruit"],
     imageUrl:
-      "https://images.unsplash.com/photo-1577234286642-fc512a5f8f11?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1577234286642-fc512a5f8f11.jpg"
   },
   {
     keywords: ["梨", "pear"],
     imageUrl:
-      "https://images.unsplash.com/photo-1514756331096-242fdeb70d4a?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1514756331096-242fdeb70d4a.jpg"
   },
   {
     keywords: ["鸡蛋", "egg"],
     imageUrl:
-      "https://images.unsplash.com/photo-1506976785307-8732e854ad03?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1506976785307-8732e854ad03.jpg"
   },
   {
     keywords: ["菠菜", "spinach"],
     imageUrl:
-      "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1576045057995-568f588f82fb.jpg"
   },
   {
     keywords: ["番茄", "tomato"],
     imageUrl:
-      "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1592924357228-91a4daadcfea.jpg"
   },
   {
     keywords: ["黄瓜", "cucumber"],
     imageUrl:
-      "https://images.unsplash.com/photo-1449300079323-02e209d9d3a6?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1449300079323-02e209d9d3a6.jpg"
   },
   {
     keywords: ["生菜", "lettuce", "小白菜", "bok choy", "大白菜", "chinese cabbage"],
     imageUrl:
-      "https://images.unsplash.com/photo-1603048719539-9ecb4aa395e3?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1603048719539-9ecb4aa395e3.jpg"
   },
   {
     keywords: ["胡萝卜", "carrot"],
     imageUrl:
-      "https://images.unsplash.com/photo-1445282768818-728615cc910a?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1445282768818-728615cc910a.jpg"
   },
   {
     keywords: ["彩椒", "bell pepper"],
     imageUrl:
-      "https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1563565375-f3fdfdbefa83.jpg"
   },
   {
     keywords: ["木耳", "wood ear mushroom"],
     imageUrl:
-      "https://images.unsplash.com/photo-1504545102780-26774c1bb073?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1504545102780-26774c1bb073.jpg"
   },
   {
     keywords: ["蘑菇"],
     imageUrl:
-      "https://images.unsplash.com/photo-1504545102780-26774c1bb073?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1504545102780-26774c1bb073.jpg"
   },
   {
     keywords: ["西兰花", "broccoli"],
     imageUrl:
-      "https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1459411621453-7b03977f4bfc.jpg"
   },
   {
     keywords: ["玉米", "corn"],
     imageUrl:
-      "https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1551754655-cd27e38d2076.jpg"
   },
   {
     keywords: ["红薯", "sweet potato"],
     imageUrl:
-      "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1518977676601-b53f82aba655.jpg"
   },
   {
     keywords: ["山药", "yam"],
     imageUrl:
-      "https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1518977676601-b53f82aba655.jpg"
   },
   {
     keywords: ["莲藕", "lotus root"],
     imageUrl:
-      "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1586201375761-83865001e31c.jpg"
   },
   {
     keywords: ["南瓜", "pumpkin"],
     imageUrl:
-      "https://images.unsplash.com/photo-1506917728037-b6af01a7d403?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1506917728037-b6af01a7d403.jpg"
   },
   {
     keywords: ["糙米饭", "brown rice"],
     imageUrl:
-      "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1586201375761-83865001e31c.jpg"
   },
   {
     keywords: ["米饭", "white rice"],
     excludeKeywords: ["糙米饭", "brown rice"],
     imageUrl:
-      "https://images.unsplash.com/photo-1516684732162-798a0062be99?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1516684732162-798a0062be99.jpg"
   },
   {
     keywords: ["米粉", "rice noodles", "全麦面", "whole wheat noodles"],
     imageUrl:
-      "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1569718212165-3a8278d5f624.jpg"
   },
   {
     keywords: ["牛奶"],
     imageUrl:
-      "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1550583724-b2692b85b150.jpg"
   },
   {
     keywords: ["乳清蛋白粉", "whey protein"],
     imageUrl:
-      "https://images.unsplash.com/photo-1774793476396-de61c6d0fa20?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1774793476396-de61c6d0fa20.jpg"
   },
   {
     keywords: ["酸奶", "greek yogurt", "yogurt"],
     imageUrl:
-      "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1488477181946-6428a0291777.jpg"
   },
   {
     keywords: ["茅屋奶酪", "cottage cheese"],
     imageUrl:
-      "https://images.unsplash.com/photo-1753173301157-8136a70b4178?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1753173301157-8136a70b4178.jpg"
   },
   {
     keywords: ["奶酪", "cheese"],
     imageUrl:
-      "https://images.unsplash.com/photo-1452195100486-9cc805987862?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1452195100486-9cc805987862.jpg"
   },
   {
     keywords: ["燕麦", "oats"],
     imageUrl:
-      "https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1517673132405-a56a62b18caf.jpg"
   },
   {
     keywords: ["全麦面包", "bread"],
     imageUrl:
-      "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1509440159596-0249088772ff.jpg"
   },
   {
     keywords: ["杏仁", "almond"],
     imageUrl:
-      "https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1508061253366-f7da158b6d46.jpg"
   },
   {
     keywords: ["核桃", "walnut", "腰果", "cashew"],
     imageUrl:
-      "https://images.unsplash.com/photo-1615485925600-97237c4fc1ec?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1615485925600-97237c4fc1ec.jpg"
   },
   {
     keywords: ["毛豆", "edamame"],
     imageUrl:
-      "https://images.unsplash.com/photo-1603048719539-9ecb4aa395e3?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1603048719539-9ecb4aa395e3.jpg"
   },
   {
     keywords: ["黑豆", "black beans", "鹰嘴豆", "chickpeas"],
     imageUrl:
-      "https://images.unsplash.com/photo-1515543904379-3d757afe72e4?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1515543904379-3d757afe72e4.jpg"
   },
   {
     keywords: ["海带", "seaweed"],
     imageUrl:
-      "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=800&q=80"
+      "/food-images/photo-1576045057995-568f588f82fb.jpg"
   }
 ];
 

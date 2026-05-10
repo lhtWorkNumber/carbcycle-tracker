@@ -163,7 +163,7 @@
 - [x] 隐私政策草案：[`privacy-policy-draft.md`](./privacy-policy-draft.md)
 - [x] 个人信息收集说明草案：[`personal-information-collection-list.md`](./personal-information-collection-list.md)
 - [x] 第三方服务说明草案（Supabase / Open Food Facts / Vercel / 微信等）：[`third-party-services.md`](./third-party-services.md)
-- [x] 合规草案已补充摄像头扫码用途、手动条码兜底、第三方食物图片来源、自定义食物用户归属待验收口径、身体对比照当前仅本地预览口径
+- [x] 合规草案已补充摄像头扫码用途、手动条码兜底、Open Food Facts 商品图 / 内置同源静态图 / 自定义图片 URL 来源、自定义食物用户归属待验收口径、身体对比照当前仅本地预览口径
 - [ ] 运营主体、联系方式、通信地址、投诉反馈入口已补齐（人工待补）
 - [ ] 账号注销 / 删除全部数据 / 撤回授权处理流程已补齐（人工待补）
 - [ ] 自定义食物用户归属已完成数据库迁移、接口过滤、前端展示、跨账号隔离和测试账号验收；验收前不得在正式隐私材料中承诺用户私有（人工待补）
