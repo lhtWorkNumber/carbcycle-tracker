@@ -6,7 +6,9 @@ import { LoaderCircle, MailCheck, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LifestylePanel } from "@/components/visual/lifestyle-panel";
 import { useToast } from "@/hooks/use-toast";
+import { loginVisualImage } from "@/lib/food-images";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -78,6 +80,16 @@ export function LoginForm() {
               当前阶段先使用邮箱 Magic Link 登录。后续可以继续扩展手机号、微信登录等方式。
             </p>
           </div>
+          <LifestylePanel
+            imageUrl={loginVisualImage}
+            eyebrow="TODAY"
+            title="饮食、训练和体重趋势在同一条记录线里。"
+            metrics={[
+              { label: "蛋白目标", value: "132g" },
+              { label: "剩余热量", value: "620" }
+            ]}
+            className="hidden lg:block"
+          />
           <div className="space-y-3 rounded-[2rem] bg-white/72 p-5 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5">
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-1 h-5 w-5 text-primary" />

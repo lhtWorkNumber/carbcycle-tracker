@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseJsonBody, withObservedApiRoute } from "@/lib/api";
 import { type DailyPlan, type DayType } from "@/lib/domain";
 import { formatDateKey } from "@/lib/format";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createRateLimitResponse, rateLimit, withRateLimitHeaders } from "@/lib/rate-limit";
-import { getCurrentAuthUser } from "@/lib/supabase/server";
 import { createDailyPlanSchema, upsertWeeklyPlansSchema } from "@/lib/validation";
 
 function normalizeDailyPlan(plan: {
@@ -95,24 +95,17 @@ export async function GET(request: NextRequest) {
       return createRateLimitResponse(limit);
     }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(NextResponse.json([]), limit);
   }
+
+  const { user } = userContext;
 
   const plans = await prisma.dailyPlan.findMany({
     where: {
@@ -139,27 +132,20 @@ export async function POST(request: NextRequest) {
     return withRateLimitHeaders(parsed.response, limit);
   }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(
       NextResponse.json({ error: "请先完成用户资料设置后再生成计划。" }, { status: 409 }),
       limit
     );
   }
+
+  const { user } = userContext;
 
   const plan = await prisma.dailyPlan.upsert({
     where: {
@@ -192,27 +178,20 @@ export async function PUT(request: NextRequest) {
     return withRateLimitHeaders(parsed.response, limit);
   }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(
       NextResponse.json({ error: "请先完成用户资料设置后再生成计划。" }, { status: 409 }),
       limit
     );
   }
+
+  const { user } = userContext;
 
   const plans = await Promise.all(
     parsed.data.plans.map((plan) =>

@@ -167,6 +167,8 @@ export interface BodyRecordEntry {
   weight: number;
   bodyFatPercentage?: number;
   waistCm?: number;
+  beforePhotoUrl?: string;
+  afterPhotoUrl?: string;
   note?: string;
 }
 

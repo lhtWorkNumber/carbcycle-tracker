@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { parseJsonBody, withObservedApiRoute } from "@/lib/api";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createRateLimitResponse, rateLimit, withRateLimitHeaders } from "@/lib/rate-limit";
 import { getCurrentAuthUser } from "@/lib/supabase/server";
@@ -27,17 +28,13 @@ export async function GET(request: NextRequest) {
       return createRateLimitResponse(limit);
     }
 
-    const authUser = await getCurrentAuthUser();
+    const userContext = await getCurrentDbUserContext();
 
-    if (!authUser) {
+    if (userContext.status === "unauthenticated") {
       return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
     }
 
-    const user = await prisma.user.findUnique({
-      where: {
-        auth_user_id: authUser.id
-      }
-    });
+    const user = userContext.user;
 
     return withRateLimitHeaders(
       NextResponse.json(

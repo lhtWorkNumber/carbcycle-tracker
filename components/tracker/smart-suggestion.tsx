@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LoaderCircle, Sparkles } from "lucide-react";
 
+import { FoodImage } from "@/components/tracker/food-image";
 import { suggestFoodsByRemainingMacros } from "@/lib/calculator";
 import { FoodCategory, type FoodItemSummary, type RemainingMacros } from "@/lib/domain";
 import { foodCategoryLabels } from "@/lib/ui-config";
@@ -93,18 +94,21 @@ export function SmartSuggestion({
             <Link
               key={food.id}
               href="/add-food?meal=snack"
-              className="rounded-[1.35rem] bg-secondary/70 px-4 py-4 transition-colors hover:bg-secondary"
+              className="flex gap-3 rounded-[1.35rem] bg-secondary/70 p-3 transition-colors hover:bg-secondary"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{food.nameZh}</p>
-                  <p className="text-xs text-muted-foreground">{foodCategoryLabels[food.category]}</p>
+              <FoodImage food={food} className="h-20 w-20 shrink-0 rounded-[1.05rem]" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{food.nameZh}</p>
+                    <p className="text-xs text-muted-foreground">{foodCategoryLabels[food.category]}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-background px-2.5 py-1 text-xs font-semibold shadow-sm">
+                    {Math.round(food.caloriesPer100g)} kcal
+                  </span>
                 </div>
-                <span className="rounded-full bg-background px-2.5 py-1 text-xs font-semibold shadow-sm">
-                  {Math.round(food.caloriesPer100g)} kcal
-                </span>
+                <p className="mt-3 text-sm text-muted-foreground">{food.reason}</p>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">{food.reason}</p>
             </Link>
           ))}
         </div>

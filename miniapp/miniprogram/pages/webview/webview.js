@@ -1,11 +1,33 @@
 const config = require("../../config");
 
+function getOrigin(url) {
+  const match = /^(https:\/\/[^/?#]+)(?:[/?#]|$)/.exec(url);
+  return match ? match[1].toLowerCase() : "";
+}
+
 function resolveUrl(options) {
+  const configuredOrigin = getOrigin(config.WEB_APP_URL);
+
   if (options.url) {
-    return decodeURIComponent(options.url);
+    const decodedUrl = decodeURIComponent(options.url);
+
+    if (decodedUrl.charAt(0) === "/" && configuredOrigin) {
+      return `${configuredOrigin}${decodedUrl}`;
+    }
+
+    return decodedUrl;
   }
 
   return config.WEB_APP_URL;
+}
+
+function isAllowedWebviewUrl(url) {
+  const configuredOrigin = getOrigin(config.WEB_APP_URL);
+  const targetOrigin = getOrigin(url);
+
+  return Boolean(configuredOrigin) &&
+    configuredOrigin.indexOf("your-domain.com") === -1 &&
+    targetOrigin === configuredOrigin;
 }
 
 Page({
@@ -16,9 +38,9 @@ Page({
   onLoad(options) {
     const src = resolveUrl(options);
 
-    if (!/^https:\/\/[^/]+/.test(src)) {
+    if (!isAllowedWebviewUrl(src)) {
       wx.showToast({
-        title: "H5 地址无效",
+        title: "H5 地址未配置",
         icon: "none"
       });
       wx.navigateBack();

@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import {
   calculateBMR,
+  calculateAchievements,
   calculateDailyProgress,
   calculateFoodItemMacros,
   calculateMealMacros,
@@ -21,7 +22,17 @@ import {
   calculateWeeklyAverage,
   generateCarbCyclingPlan
 } from "@/lib/calculator";
-import { ActivityLevel, DayType, Gender, Goal, MealType, type DailyPlan, type LoggedMeal } from "@/lib/domain";
+import {
+  ActivityLevel,
+  DayType,
+  Gender,
+  Goal,
+  MealType,
+  type BodyRecordEntry,
+  type DailyPlan,
+  type LoggedMeal,
+  type WeeklySummaryReport
+} from "@/lib/domain";
 
 describe("calculateBMR", () => {
   it("calculates male BMR with the Mifflin-St Jeor formula", () => {
@@ -291,5 +302,50 @@ describe("calculateWeeklyAverage", () => {
         percentage: 0
       }
     });
+  });
+});
+
+describe("calculateAchievements", () => {
+  it("calculates progress from chronological body records regardless of input order", () => {
+    const bodyRecords: BodyRecordEntry[] = [
+      { id: "newest", date: "2026-05-03", weight: 69 },
+      { id: "middle", date: "2026-05-02", weight: 70 },
+      { id: "oldest", date: "2026-05-01", weight: 75 }
+    ];
+    const weeklySummaries: WeeklySummaryReport[] = [
+      {
+        weekKey: "2026-04-27",
+        weekLabel: "04/27 - 05/03",
+        createdAt: "2026-05-03T12:00:00.000Z",
+        adherenceRate: 92,
+        weightChange: -3,
+        calorieAverage: 1900,
+        proteinAverage: 150,
+        fatAverage: 55,
+        carbsAverage: 180,
+        motivationalMessage: "保持得很好"
+      },
+      {
+        weekKey: "2026-04-20",
+        weekLabel: "04/20 - 04/26",
+        createdAt: "2026-04-26T12:00:00.000Z",
+        adherenceRate: 50,
+        weightChange: 0,
+        calorieAverage: 2200,
+        proteinAverage: 120,
+        fatAverage: 70,
+        carbsAverage: 240,
+        motivationalMessage: "继续调整"
+      }
+    ];
+
+    const achievements = calculateAchievements({
+      bodyRecords,
+      weeklySummaries,
+      streakDays: 7
+    });
+
+    expect(achievements.find((achievement) => achievement.id === "streak-7")?.unlocked).toBe(true);
+    expect(achievements.find((achievement) => achievement.id === "weight-loss-5")?.unlocked).toBe(true);
   });
 });

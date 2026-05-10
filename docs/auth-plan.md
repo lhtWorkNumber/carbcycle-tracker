@@ -52,17 +52,24 @@
 本轮已完成：
 
 - Task 1：鉴权方案定型与基础设施准备
-- Task 2：登录页、Magic Link 登录、登录回调、当前用户上下文基础版
-- Task 3：用户资料正式入库的后端字段与 API 改造基础
+- Task 2：登录页、Magic Link 登录、登录回调、当前用户上下文
+- Task 3：用户资料正式入库，并支持引导页与设置页保存资料
+- Task 4：核心业务数据按当前登录用户读取与写入
+- Task 5：正式数据模式下的 shell 页面登录保护与资料完成保护
 
-本轮仍未完成：
+当前代码已覆盖：
 
-- 基于真实登录用户的完整资料读取覆盖
-- 所有业务页面按登录用户读取真实后端数据
-- 完整的未登录保护策略
-- 业务记录按 auth 用户写库
+- `/api/bootstrap` 基于当前登录用户一次性拉取资料、餐食、身体记录、运动、每日计划、模板、饮水、周报与成就数据
+- `/api/users` 基于 Supabase session 读取 / upsert 当前用户资料
+- `/api/meal-logs`、`/api/body-records`、`/api/exercise-logs`、`/api/daily-plans` 按当前 auth 用户写库
+- `/api/meal-templates`、`/api/water-logs`、`/api/weekly-summaries`、`/api/achievements` 按当前数据库用户隔离
+- Supabase 已配置时，`(shell)` 业务页面要求先登录；已登录但未完成资料的用户会进入 `/onboarding`
 
-这些属于后续 Task 3 / Task 4。
+仍需在真实环境验证：
+
+- 配置真实 Supabase 项目的邮箱 OTP / Magic Link 回跳
+- 使用真实浏览器会话完成登录、引导、记录、刷新后的数据恢复回归
+- 生产 Supabase PostgreSQL 迁移与 Vercel 环境变量联调
 
 ---
 
@@ -96,23 +103,23 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 
 建议按这个顺序继续：
 
-1. 创建登录页与登录表单
-2. 建立当前用户上下文
-3. 引导页完成后把用户资料写入数据库
-4. 把前端 store 从“默认 demo 用户”切换成“当前登录用户”
+1. 在 Supabase 项目中配置 Auth URL、邮件模板与允许的重定向地址
+2. 用真实账号跑通 Magic Link 登录、引导资料入库和 shell 页面保护
+3. 部署到 Vercel 后验证 PostgreSQL 生产 schema、cookie 与回调域名
+4. 根据真实使用反馈决定是否追加手机号验证码、微信登录或原生小程序登录
 
 ---
 
 ## 风险提示
 
-### 1. 现在还没有真正用户登录
+### 1. 需要真实 Supabase 环境联调
 
-虽然基础设施已经准备好，但用户仍然不能真正登录。
+代码路径已经接好，但 Magic Link 是否可达取决于 Supabase 项目的 Auth 配置、邮件投递和重定向白名单。
 
-### 2. 业务数据仍未按 auth 用户隔离
+### 2. 自定义食物用户归属仍需回归
 
-当前 API 还没有基于 Supabase session 做用户身份绑定。
+当前代码路径已为 `FoodItem` 增加可空 `user_id` 字段，并在创建 / 查询自定义食物时按当前用户处理。上线前仍需确认数据库迁移已执行、旧自定义食物数据归属策略已明确、接口过滤和前端展示通过跨账号回归。
 
-### 3. 当前还是“认证基础设施就绪”，不是“正式用户体系完成”
+### 3. 生产环境仍需完成数据库与域名回归
 
-所以这一步完成后，不代表用户系统已经上线，只代表后续实现路径已经固定。
+Vercel、Supabase PostgreSQL、邮件回跳域名和 PWA 缓存需要在同一套生产配置下完成回归后再上线。

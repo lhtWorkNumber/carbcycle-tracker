@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { parseJsonBody, withObservedApiRoute } from "@/lib/api";
+import { parseJsonBody, parseNumericResourceId, withObservedApiRoute } from "@/lib/api";
 import { formatDateKey } from "@/lib/format";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createRateLimitResponse, rateLimit, withRateLimitHeaders } from "@/lib/rate-limit";
-import { getCurrentAuthUser } from "@/lib/supabase/server";
 import { createExerciseLogSchema } from "@/lib/validation";
 
 function normalizeExercise(exercise: {
@@ -33,24 +33,17 @@ export async function GET(request: NextRequest) {
       return createRateLimitResponse(limit);
     }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(NextResponse.json([]), limit);
   }
+
+  const { user } = userContext;
 
   const exercises = await prisma.exerciseLog.findMany({
     where: {
@@ -77,27 +70,20 @@ export async function POST(request: NextRequest) {
     return withRateLimitHeaders(parsed.response, limit);
   }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(
       NextResponse.json({ error: "请先完成用户资料设置后再记录训练。" }, { status: 409 }),
       limit
     );
   }
+
+  const { user } = userContext;
 
   const exercise = await prisma.exerciseLog.create({
     data: {
@@ -111,5 +97,46 @@ export async function POST(request: NextRequest) {
   });
 
     return withRateLimitHeaders(NextResponse.json(normalizeExercise(exercise), { status: 201 }), limit);
+  });
+}
+
+export async function DELETE(request: NextRequest) {
+  return withObservedApiRoute(request, "/api/exercise-logs", async () => {
+    const limit = rateLimit(request, { key: "exercise-logs:delete", limit: 20, windowMs: 60_000 });
+
+    if (!limit.allowed) {
+      return createRateLimitResponse(limit);
+    }
+
+    const exerciseLogId = parseNumericResourceId(request.nextUrl.searchParams.get("id"), "exercise-log-");
+
+    if (!exerciseLogId) {
+      return withRateLimitHeaders(NextResponse.json({ error: "缺少有效的运动记录 ID。" }, { status: 400 }), limit);
+    }
+
+    const userContext = await getCurrentDbUserContext();
+
+    if (userContext.status === "unauthenticated") {
+      return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
+    }
+
+    if (userContext.status === "missing_profile") {
+      return withRateLimitHeaders(NextResponse.json({ error: "请先完成用户资料设置。" }, { status: 409 }), limit);
+    }
+
+    const { user } = userContext;
+
+    const deleted = await prisma.exerciseLog.deleteMany({
+      where: {
+        id: exerciseLogId,
+        user_id: user.id
+      }
+    });
+
+    if (deleted.count === 0) {
+      return withRateLimitHeaders(NextResponse.json({ error: "没有找到这条运动记录。" }, { status: 404 }), limit);
+    }
+
+    return withRateLimitHeaders(NextResponse.json({ ok: true }), limit);
   });
 }

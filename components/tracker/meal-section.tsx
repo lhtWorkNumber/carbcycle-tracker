@@ -1,15 +1,20 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { LoaderCircle, Plus, Trash2 } from "lucide-react";
 
 import { type LoggedMeal, type MealType } from "@/lib/domain";
 import { mealTypeLabels } from "@/lib/ui-config";
+import { Button } from "@/components/ui/button";
 
 export function MealSection({
   mealType,
-  meals
+  meals,
+  deletingMealId,
+  onDeleteMeal
 }: {
   mealType: MealType;
   meals: LoggedMeal[];
+  deletingMealId?: string | null;
+  onDeleteMeal?: (mealId: string) => void;
 }) {
   const totalCalories = meals.reduce((sum, meal) => sum + meal.calories, 0);
 
@@ -33,15 +38,35 @@ export function MealSection({
           meals.map((meal) => (
             <div
               key={meal.id}
-              className="flex items-center justify-between rounded-2xl bg-background/70 px-3 py-3 dark:bg-background/40"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-background/70 px-3 py-3 dark:bg-background/40"
             >
-              <div>
-                <p className="font-medium">{meal.nameZh}</p>
-                <p className="text-xs text-muted-foreground">
+              <div className="min-w-0">
+                <p className="truncate font-medium" title={meal.nameZh}>
+                  {meal.nameZh}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
                   {meal.quantityGrams}g · 蛋白 {Math.round(meal.protein)}g · 碳水 {Math.round(meal.carbs)}g
                 </p>
               </div>
-              <p className="text-sm font-semibold">{Math.round(meal.calories)} kcal</p>
+              <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                <p className="whitespace-nowrap text-right text-sm font-semibold">{Math.round(meal.calories)} kcal</p>
+                {onDeleteMeal ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteMeal(meal.id)}
+                    disabled={deletingMealId === meal.id}
+                    aria-label={`删除${meal.nameZh}`}
+                  >
+                    {deletingMealId === meal.id ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                ) : null}
+              </div>
             </div>
           ))
         ) : (

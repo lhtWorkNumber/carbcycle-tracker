@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LoaderCircle, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { UnitInput } from "@/components/ui/unit-input";
@@ -14,12 +15,17 @@ import { useTrackerStore } from "@/store/tracker-store";
 
 const exerciseTypes = [ExerciseType.STRENGTH, ExerciseType.CARDIO, ExerciseType.HIIT, ExerciseType.FLEXIBILITY] as const;
 
+function isServerExerciseId(exerciseId: string) {
+  return exerciseId.startsWith("exercise-log-");
+}
+
 export function ExerciseScreen() {
   const { toast } = useToast();
   const selectedDate = useTrackerStore((state) => state.selectedDate);
   const exercises = useTrackerStore((state) => state.exercises);
   const addExercise = useTrackerStore((state) => state.addExercise);
   const insertExerciseFromServer = useTrackerStore((state) => state.insertExerciseFromServer);
+  const removeExercise = useTrackerStore((state) => state.removeExercise);
   const authUser = useAuthStore((state) => state.user);
   const isAuthConfigured = useAuthStore((state) => state.isConfigured);
   const todayExercises = exercises.filter((exercise) => exercise.date === selectedDate);
@@ -28,8 +34,29 @@ export function ExerciseScreen() {
   const [calories, setCalories] = useState("320");
   const [exerciseType, setExerciseType] = useState<ExerciseTypeType>(ExerciseType.STRENGTH);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingExerciseId, setDeletingExerciseId] = useState<string | null>(null);
+  const trimmedExerciseName = exerciseName.trim();
+  const durationMinutes = Number(duration);
+  const caloriesBurned = Number(calories);
+  const canSubmit =
+    trimmedExerciseName.length > 0 &&
+    Number.isInteger(durationMinutes) &&
+    durationMinutes > 0 &&
+    durationMinutes <= 600 &&
+    Number.isFinite(caloriesBurned) &&
+    caloriesBurned >= 0 &&
+    caloriesBurned <= 5000;
 
   async function addCurrentExercise() {
+    if (!canSubmit) {
+      toast({
+        title: "请检查运动信息",
+        description: "名称、时长和消耗需要填写为有效数值。",
+        variant: "error"
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -41,9 +68,9 @@ export function ExerciseScreen() {
           },
           body: JSON.stringify({
             date: new Date(`${selectedDate}T12:00:00.000Z`).toISOString(),
-            exercise_name: exerciseName,
-            duration_minutes: Number(duration),
-            calories_burned: Number(calories),
+            exercise_name: trimmedExerciseName,
+            duration_minutes: durationMinutes,
+            calories_burned: caloriesBurned,
             exercise_type: exerciseType
           })
         });
@@ -57,16 +84,16 @@ export function ExerciseScreen() {
         insertExerciseFromServer(exercise);
       } else {
         addExercise({
-          exerciseName,
-          durationMinutes: Number(duration),
-          caloriesBurned: Number(calories),
+          exerciseName: trimmedExerciseName,
+          durationMinutes,
+          caloriesBurned,
           exerciseType
         });
       }
 
       toast({
         title: "运动记录已保存",
-        description: `${exerciseName} 已加入今日训练。`,
+        description: `${trimmedExerciseName} 已加入今日训练。`,
         variant: "success"
       });
     } catch (error) {
@@ -77,6 +104,38 @@ export function ExerciseScreen() {
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function deleteExercise(exerciseId: string) {
+    setDeletingExerciseId(exerciseId);
+
+    try {
+      if (isAuthConfigured && authUser && isServerExerciseId(exerciseId)) {
+        const response = await fetch(`/api/exercise-logs?id=${encodeURIComponent(exerciseId)}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error ?? "删除运动记录失败");
+        }
+      }
+
+      removeExercise(exerciseId);
+      toast({
+        title: "运动记录已删除",
+        description: "今日训练统计已经同步更新。",
+        variant: "success"
+      });
+    } catch (error) {
+      toast({
+        title: "删除失败",
+        description: error instanceof Error ? error.message : "请稍后再试。",
+        variant: "error"
+      });
+    } finally {
+      setDeletingExerciseId(null);
     }
   }
 
@@ -132,7 +191,8 @@ export function ExerciseScreen() {
             ))}
           </div>
         </div>
-        <Button className="mt-4 h-12 w-full rounded-[1.3rem]" onClick={() => void addCurrentExercise()} disabled={submitting}>
+        <Button className="mt-4 h-12 w-full rounded-[1.3rem]" onClick={() => void addCurrentExercise()} disabled={submitting || !canSubmit}>
+          {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
           {submitting ? "保存中…" : "保存运动记录"}
         </Button>
       </section>
@@ -157,19 +217,41 @@ export function ExerciseScreen() {
       </section>
 
       <section className="space-y-3">
-        {todayExercises.map((exercise) => (
-          <div key={exercise.id} className="rounded-[1.6rem] bg-white/72 p-4 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{exercise.exerciseName}</p>
-                <p className="text-sm text-muted-foreground">
-                  {exerciseTypeLabels[exercise.exerciseType]} · {exercise.durationMinutes} 分钟
-                </p>
+        {todayExercises.length > 0 ? (
+          todayExercises.map((exercise) => (
+            <div key={exercise.id} className="rounded-[1.6rem] bg-white/72 p-4 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{exercise.exerciseName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {exerciseTypeLabels[exercise.exerciseType]} · {exercise.durationMinutes} 分钟
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="whitespace-nowrap text-lg font-semibold">{exercise.caloriesBurned} kcal</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+                    onClick={() => void deleteExercise(exercise.id)}
+                    disabled={deletingExerciseId === exercise.id}
+                    aria-label="删除运动记录"
+                  >
+                    {deletingExerciseId === exercise.id ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-              <p className="text-lg font-semibold">{exercise.caloriesBurned} kcal</p>
             </div>
+          ))
+        ) : (
+          <div className="rounded-[1.6rem] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            今天还没有运动记录，选一个快速项目或手动填写后保存。
           </div>
-        ))}
+        )}
       </section>
     </div>
   );

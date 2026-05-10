@@ -1,7 +1,33 @@
 const config = require("../../config");
 
+function getOrigin(url) {
+  const match = /^(https:\/\/[^/?#]+)(?:[/?#]|$)/.exec(url);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function resolveTargetUrl(rawUrl) {
+  const configuredOrigin = getOrigin(config.WEB_APP_URL);
+
+  if (!rawUrl) {
+    return config.WEB_APP_URL;
+  }
+
+  const decodedUrl = decodeURIComponent(rawUrl);
+
+  if (decodedUrl.charAt(0) === "/" && configuredOrigin) {
+    return `${configuredOrigin}${decodedUrl}`;
+  }
+
+  return decodedUrl;
+}
+
 function isConfiguredUrl(url) {
-  return /^https:\/\/[^/]+/.test(url) && url.indexOf("your-domain.com") === -1;
+  const configuredOrigin = getOrigin(config.WEB_APP_URL);
+  const targetOrigin = getOrigin(url);
+
+  return Boolean(configuredOrigin) &&
+    configuredOrigin.indexOf("your-domain.com") === -1 &&
+    targetOrigin === configuredOrigin;
 }
 
 Page({
@@ -12,7 +38,7 @@ Page({
 
   onLoad(options) {
     if (options.url) {
-      const targetUrl = decodeURIComponent(options.url);
+      const targetUrl = resolveTargetUrl(options.url);
       this.setData({
         targetUrl,
         canOpen: isConfiguredUrl(targetUrl)

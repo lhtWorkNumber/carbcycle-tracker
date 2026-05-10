@@ -1,6 +1,7 @@
 import { AddFoodScreen } from "@/components/screens/add-food-screen";
 import { prisma } from "@/lib/prisma";
 import { FoodCategory, MealType, type FoodItemSummary } from "@/lib/domain";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,26 @@ export default async function AddFoodPage({
   let foods: Awaited<ReturnType<typeof prisma.foodItem.findMany>> = [];
 
   try {
+    const userContext = await getCurrentDbUserContext();
+    const currentUserId = userContext.status === "ready" ? userContext.user.id : null;
+
     foods = await prisma.foodItem.findMany({
+      where: {
+        OR: [
+          {
+            is_custom: false,
+            user_id: null
+          },
+          ...(currentUserId
+            ? [
+                {
+                  is_custom: true,
+                  user_id: currentUserId
+                }
+              ]
+            : [])
+        ]
+      },
       orderBy: [{ is_custom: "desc" }, { category: "asc" }, { name_zh: "asc" }]
     });
   } catch {

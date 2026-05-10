@@ -412,9 +412,11 @@ export function calculateAchievements({
   streakDays: number;
 }): Achievement[] {
   const uniqueRecordDays = new Set(bodyRecords.map((record) => record.date)).size;
-  const latestSummary = weeklySummaries.at(-1);
-  const firstWeight = bodyRecords.at(0)?.weight ?? 0;
-  const latestWeight = bodyRecords.at(-1)?.weight ?? 0;
+  const sortedSummaries = [...weeklySummaries].sort((left, right) => left.weekKey.localeCompare(right.weekKey));
+  const sortedBodyRecords = [...bodyRecords].sort((left, right) => left.date.localeCompare(right.date));
+  const latestSummary = sortedSummaries.at(-1);
+  const firstWeight = sortedBodyRecords.at(0)?.weight ?? 0;
+  const latestWeight = sortedBodyRecords.at(-1)?.weight ?? 0;
   const lostWeight = Math.max(0, firstWeight - latestWeight);
 
   return [

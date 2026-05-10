@@ -16,6 +16,14 @@ const foodCategorySchema = z.enum([
   "BEVERAGE",
   "OTHER"
 ]);
+const jsonObjectStringSchema = z.string().max(4000).refine((value) => {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+}, "必须是合法的 JSON 对象。");
 
 export const createUserSchema = z.object({
   name: z.string().trim().min(1).max(64),
@@ -24,7 +32,10 @@ export const createUserSchema = z.object({
   height: z.number().min(100).max(260),
   weight: z.number().min(25).max(350),
   body_fat_percentage: z.number().min(0).max(75).nullable().optional(),
-  training_days: z.array(z.number().int().min(0).max(6)).max(7),
+  training_days: z
+    .array(z.number().int().min(0).max(6))
+    .max(7)
+    .refine((days) => new Set(days).size === days.length, "训练日不能重复。"),
   activity_level: activityLevelSchema,
   goal: goalSchema
 });
@@ -54,6 +65,8 @@ export const createBodyRecordSchema = z.object({
   weight: z.number().min(25).max(350),
   body_fat_percentage: z.number().min(0).max(75).nullable().optional(),
   waist_cm: z.number().min(20).max(300).nullable().optional(),
+  before_photo_url: z.string().url().max(2000).nullable().optional(),
+  after_photo_url: z.string().url().max(2000).nullable().optional(),
   note: z.string().max(500).optional()
 });
 
@@ -121,14 +134,14 @@ export const upsertWeeklySummariesSchema = z.object({
     z.object({
       weekKey: z.string().min(1).max(32),
       weekLabel: z.string().min(1).max(64),
-      adherenceRate: z.number(),
-      weightChange: z.number(),
-      calorieAverage: z.number(),
-      proteinAverage: z.number(),
-      fatAverage: z.number(),
-      carbsAverage: z.number(),
+      adherenceRate: z.number().min(0).max(100),
+      weightChange: z.number().min(-100).max(100),
+      calorieAverage: z.number().nonnegative().max(10000),
+      proteinAverage: z.number().nonnegative().max(1000),
+      fatAverage: z.number().nonnegative().max(1000),
+      carbsAverage: z.number().nonnegative().max(1000),
       motivationalMessage: z.string().min(1).max(500),
-      comparisonJson: z.string().nullable().optional()
+      comparisonJson: jsonObjectStringSchema.nullable().optional()
     })
   ).min(1).max(52)
 });

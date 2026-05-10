@@ -1,6 +1,7 @@
 import { SettingsScreen } from "@/components/screens/settings-screen";
 import { prisma } from "@/lib/prisma";
 import { FoodCategory, type FoodItemSummary } from "@/lib/domain";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,19 @@ export default async function SettingsPage() {
   let customFoods: Awaited<ReturnType<typeof prisma.foodItem.findMany>> = [];
 
   try {
-    customFoods = await prisma.foodItem.findMany({
-      where: {
-        is_custom: true
-      },
-      orderBy: {
-        id: "desc"
-      }
-    });
+    const userContext = await getCurrentDbUserContext();
+
+    if (userContext.status === "ready") {
+      customFoods = await prisma.foodItem.findMany({
+        where: {
+          is_custom: true,
+          user_id: userContext.user.id
+        },
+        orderBy: {
+          id: "desc"
+        }
+      });
+    }
   } catch {
     customFoods = [];
   }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { type ChangeEvent, type MutableRefObject, useEffect, useRef, useState } from "react";
+import { LoaderCircle, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/auth-store";
 import { useTrackerStore } from "@/store/tracker-store";
 
+function isServerBodyRecordId(recordId: string) {
+  return recordId.startsWith("body-record-");
+}
+
 function UploadCard({
   label,
   preview,
@@ -18,13 +23,13 @@ function UploadCard({
 }: {
   label: string;
   preview: string | null;
-  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
-    <label className="flex min-h-[11rem] cursor-pointer flex-col items-center justify-center rounded-[1.6rem] border border-dashed border-border bg-white/72 p-4 text-center dark:bg-white/5">
+    <label className="flex min-h-[11rem] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.6rem] border border-dashed border-border bg-white/72 p-3 text-center dark:bg-white/5 sm:p-4">
       {preview ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt={label} className="h-40 w-full rounded-2xl object-cover" />
+        <img src={preview} alt={label} className="h-40 w-full rounded-[1.15rem] object-cover" />
       ) : (
         <p className="text-sm text-muted-foreground">{label}</p>
       )}
@@ -37,6 +42,7 @@ export function RecordScreen() {
   const { toast } = useToast();
   const addBodyRecord = useTrackerStore((state) => state.addBodyRecord);
   const insertBodyRecordFromServer = useTrackerStore((state) => state.insertBodyRecordFromServer);
+  const removeBodyRecord = useTrackerStore((state) => state.removeBodyRecord);
   const bodyRecords = useTrackerStore((state) => state.bodyRecords);
   const selectedDate = useTrackerStore((state) => state.selectedDate);
   const authUser = useAuthStore((state) => state.user);
@@ -47,10 +53,74 @@ export function RecordScreen() {
   const [note, setNote] = useState("");
   const [beforePreview, setBeforePreview] = useState<string | null>(null);
   const [afterPreview, setAfterPreview] = useState<string | null>(null);
+  const beforePreviewRef = useRef<string | null>(null);
+  const afterPreviewRef = useRef<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingRecordId, setDeletingRecordId] = useState<string | null>(null);
   const sortedBodyRecords = bodyRecords.slice().sort((left, right) => right.date.localeCompare(left.date));
+  const weightValue = Number(weight);
+  const bodyFatValue = bodyFat ? Number(bodyFat) : undefined;
+  const waistValue = waist ? Number(waist) : undefined;
+  const trimmedNote = note.trim();
+  const canSubmit =
+    Number.isFinite(weightValue) &&
+    weightValue >= 25 &&
+    weightValue <= 350 &&
+    (bodyFatValue === undefined || (Number.isFinite(bodyFatValue) && bodyFatValue >= 0 && bodyFatValue <= 75)) &&
+    (waistValue === undefined || (Number.isFinite(waistValue) && waistValue >= 20 && waistValue <= 300));
+
+  useEffect(() => {
+    return () => {
+      revokePreview(beforePreviewRef.current);
+      revokePreview(afterPreviewRef.current);
+    };
+  }, []);
+
+  function revokePreview(previewUrl: string | null) {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+  }
+
+  function setPreviewFromFile(
+    event: ChangeEvent<HTMLInputElement>,
+    currentPreviewRef: MutableRefObject<string | null>,
+    setPreview: (preview: string | null) => void
+  ) {
+    const file = event.target.files?.[0] ?? null;
+    revokePreview(currentPreviewRef.current);
+
+    if (!file) {
+      currentPreviewRef.current = null;
+      setPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    currentPreviewRef.current = previewUrl;
+    setPreview(previewUrl);
+    event.target.value = "";
+  }
+
+  function clearPhotoPreviews() {
+    revokePreview(beforePreviewRef.current);
+    revokePreview(afterPreviewRef.current);
+    beforePreviewRef.current = null;
+    afterPreviewRef.current = null;
+    setBeforePreview(null);
+    setAfterPreview(null);
+  }
 
   async function handleSubmit() {
+    if (!canSubmit) {
+      toast({
+        title: "请检查身体记录",
+        description: "体重、体脂率和腰围需要填写为有效数值。",
+        variant: "error"
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -62,10 +132,10 @@ export function RecordScreen() {
           },
           body: JSON.stringify({
             date: new Date(`${selectedDate}T12:00:00.000Z`).toISOString(),
-            weight: Number(weight),
-            body_fat_percentage: bodyFat ? Number(bodyFat) : null,
-            waist_cm: waist ? Number(waist) : null,
-            note
+            weight: weightValue,
+            body_fat_percentage: bodyFatValue ?? null,
+            waist_cm: waistValue ?? null,
+            note: trimmedNote
           })
         });
 
@@ -78,14 +148,15 @@ export function RecordScreen() {
         insertBodyRecordFromServer(record);
       } else {
         addBodyRecord({
-          weight: Number(weight),
-          bodyFatPercentage: bodyFat ? Number(bodyFat) : undefined,
-          waistCm: waist ? Number(waist) : undefined,
-          note
+          weight: weightValue,
+          bodyFatPercentage: bodyFatValue,
+          waistCm: waistValue,
+          note: trimmedNote
         });
       }
 
       setNote("");
+      clearPhotoPreviews();
       toast({
         title: "身体记录已保存",
         description: "你的体重与围度数据已经更新。",
@@ -99,6 +170,38 @@ export function RecordScreen() {
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function deleteBodyRecord(recordId: string) {
+    setDeletingRecordId(recordId);
+
+    try {
+      if (isAuthConfigured && authUser && isServerBodyRecordId(recordId)) {
+        const response = await fetch(`/api/body-records?id=${encodeURIComponent(recordId)}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error ?? "删除身体记录失败");
+        }
+      }
+
+      removeBodyRecord(recordId);
+      toast({
+        title: "身体记录已删除",
+        description: "趋势和成就数据已经同步更新。",
+        variant: "success"
+      });
+    } catch (error) {
+      toast({
+        title: "删除失败",
+        description: error instanceof Error ? error.message : "请稍后再试。",
+        variant: "error"
+      });
+    } finally {
+      setDeletingRecordId(null);
     }
   }
 
@@ -118,10 +221,11 @@ export function RecordScreen() {
         </div>
         <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="备注：例如今天睡眠、训练状态、饮食执行情况" className="mt-3" />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <UploadCard label="上传对比照（之前）" preview={beforePreview} onChange={(event) => setBeforePreview(event.target.files?.[0] ? URL.createObjectURL(event.target.files[0]) : null)} />
-          <UploadCard label="上传对比照（现在）" preview={afterPreview} onChange={(event) => setAfterPreview(event.target.files?.[0] ? URL.createObjectURL(event.target.files[0]) : null)} />
+          <UploadCard label="上传对比照（之前）" preview={beforePreview} onChange={(event) => setPreviewFromFile(event, beforePreviewRef, setBeforePreview)} />
+          <UploadCard label="上传对比照（现在）" preview={afterPreview} onChange={(event) => setPreviewFromFile(event, afterPreviewRef, setAfterPreview)} />
         </div>
-        <Button className="mt-4 h-12 w-full rounded-[1.3rem]" onClick={() => void handleSubmit()} disabled={submitting}>
+        <Button className="mt-4 h-12 w-full rounded-[1.3rem]" onClick={() => void handleSubmit()} disabled={submitting || !canSubmit}>
+          {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
           {submitting ? "保存中…" : "保存身体记录"}
         </Button>
       </section>
@@ -140,6 +244,20 @@ export function RecordScreen() {
                     {record.waistCm != null ? ` · 腰围 ${record.waistCm} cm` : ""}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+                  onClick={() => void deleteBodyRecord(record.id)}
+                  disabled={deletingRecordId === record.id}
+                  aria-label="删除身体记录"
+                >
+                  {deletingRecordId === record.id ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
               {record.note ? <p className="mt-3 text-sm text-muted-foreground">{record.note}</p> : null}
             </div>

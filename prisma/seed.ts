@@ -1,5 +1,7 @@
 import { FoodCategory, PrismaClient } from "@prisma/client";
 
+import { getExactFoodImageUrl } from "../lib/food-images";
+
 const prisma = new PrismaClient();
 
 const foodItems = [
@@ -71,6 +73,15 @@ async function main() {
   });
 
   for (const item of foodItems) {
+    const itemWithImage = {
+      ...item,
+      image_url: getExactFoodImageUrl({
+        name: item.name,
+        nameZh: item.name_zh,
+        imageUrl: null
+      })
+    };
+
     await prisma.foodItem.upsert({
       where: {
         name_name_zh: {
@@ -78,8 +89,8 @@ async function main() {
           name_zh: item.name_zh
         }
       },
-      update: item,
-      create: item
+      update: itemWithImage,
+      create: itemWithImage
     });
   }
 

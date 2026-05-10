@@ -81,6 +81,7 @@ model User {
   water_logs            WaterLog[]
   weekly_summaries      WeeklySummary[]
   achievement_progress  AchievementProgress[]
+  food_items            FoodItem[]
 }
 
 model FoodItem {
@@ -96,10 +97,13 @@ model FoodItem {
   gi_index              Float?
   image_url             String?
   is_custom             Boolean       @default(false)
+  user_id               Int?
+  user                  User?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   meal_logs             MealLog[]
   meal_template_items   MealTemplateItem[]
 
   @@unique([name, name_zh])
+  @@index([user_id, is_custom])
 }
 
 model MealLog {
@@ -143,6 +147,8 @@ model BodyRecord {
   weight                Float
   body_fat_percentage   Float?
   waist_cm              Float?
+  before_photo_url      String?
+  after_photo_url       String?
   note                  String?
   user                  User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 

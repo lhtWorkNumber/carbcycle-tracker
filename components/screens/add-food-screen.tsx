@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookmarkPlus, Plus, Search } from "lucide-react";
+import { BookmarkPlus, LoaderCircle, Plus, Search, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { BarcodeScanner } from "@/components/tracker/barcode-scanner";
+import { FoodImage } from "@/components/tracker/food-image";
 import { SectionTitle } from "@/components/tracker/section-title";
 import { summarizeTemplateItems, calculateFoodItemMacros } from "@/lib/calculator";
 import {
   FoodCategory,
   MealType,
   type FoodItemSummary,
+  type LoggedMeal,
   type MealTemplateItem
 } from "@/lib/domain";
 import { getMondayFirstDayIndex } from "@/lib/format";
@@ -32,6 +34,10 @@ const filterTabs = [
   FoodCategory.DAIRY,
   FoodCategory.SNACK
 ] as const;
+
+function hasFoodItemId(item: MealTemplateItem): item is MealTemplateItem & { foodItemId: number } {
+  return typeof item.foodItemId === "number";
+}
 
 export function AddFoodScreen({
   foods,
@@ -62,6 +68,8 @@ export function AddFoodScreen({
   const [basket, setBasket] = useState<MealTemplateItem[]>([]);
   const [scannedFood, setScannedFood] = useState<FoodItemSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
 
   const dayIndex = getMondayFirstDayIndex(selectedDate);
   const todayDayType = weeklyPlan.days[dayIndex]?.dayType ?? weeklyPlan.days[0]?.dayType;
@@ -128,6 +136,7 @@ export function AddFoodScreen({
   );
 
   const basketSummary = summarizeTemplateItems(basket);
+  const actionBusy = submitting || savingTemplate || applyingTemplateId !== null;
 
   async function submitMeal() {
     if (!selectedFood) {
@@ -217,8 +226,18 @@ export function AddFoodScreen({
     });
   }
 
+  function removeBasketItem(index: number) {
+    setBasket((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function clearBasket() {
+    setBasket([]);
+  }
+
   async function saveCurrentTemplate() {
-    if (!templateName.trim()) {
+    const trimmedTemplateName = templateName.trim();
+
+    if (!trimmedTemplateName) {
       toast({
         title: "请输入模板名称",
         description: "保存模板前需要先命名。",
@@ -237,6 +256,8 @@ export function AddFoodScreen({
     }
 
     try {
+      setSavingTemplate(true);
+
       if (isAuthConfigured && authUser) {
         const response = await fetch("/api/meal-templates", {
           method: "POST",
@@ -244,7 +265,7 @@ export function AddFoodScreen({
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            name: templateName.trim(),
+            name: trimmedTemplateName,
             mealType,
             items: basket
           })
@@ -258,14 +279,14 @@ export function AddFoodScreen({
         const template = await response.json();
         insertMealTemplateFromServer(template);
       } else {
-        saveMealTemplate(templateName.trim(), mealType, basket);
+        saveMealTemplate(trimmedTemplateName, mealType, basket);
       }
 
       setTemplateName("");
       setBasket([]);
       toast({
         title: "模板已保存",
-        description: `${templateName.trim()} 已加入你的饮食模板。`,
+        description: `${trimmedTemplateName} 已加入你的饮食模板。`,
         variant: "success"
       });
     } catch (error) {
@@ -274,6 +295,8 @@ export function AddFoodScreen({
         description: error instanceof Error ? error.message : "请稍后再试。",
         variant: "error"
       });
+    } finally {
+      setSavingTemplate(false);
     }
   }
 
@@ -284,13 +307,24 @@ export function AddFoodScreen({
       return;
     }
 
-    setSubmitting(true);
+    const loggableItems = template.items.filter(hasFoodItemId);
+
+    if (loggableItems.length === 0) {
+      toast({
+        title: "模板无法应用",
+        description: "这个模板里没有可记录到食物库的食物。",
+        variant: "error"
+      });
+      return;
+    }
+
+    setApplyingTemplateId(templateId);
 
     try {
       if (isAuthConfigured && authUser) {
-        const responses = await Promise.all(
-          template.items.map((item) =>
-            fetch("/api/meal-logs", {
+        const results = await Promise.all(
+          loggableItems.map(async (item) => {
+            const response = await fetch("/api/meal-logs", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json"
@@ -301,19 +335,33 @@ export function AddFoodScreen({
                 quantity_grams: item.quantityGrams,
                 date: new Date(`${selectedDate}T12:00:00.000Z`).toISOString()
               })
-            })
-          )
+            });
+
+            if (!response.ok) {
+              const payload = await response.json().catch(() => null);
+              return {
+                error: payload?.error ?? "应用模板失败"
+              };
+            }
+
+            return {
+              meal: (await response.json()) as LoggedMeal
+            };
+          })
         );
 
-        for (const response of responses) {
-          if (!response.ok) {
-            const payload = await response.json().catch(() => null);
-            throw new Error(payload?.error ?? "应用模板失败");
-          }
-        }
+        const savedMeals = results.filter((result): result is { meal: LoggedMeal } => "meal" in result);
+        const failedResult = results.find((result): result is { error: string } => "error" in result);
 
-        const meals = await Promise.all(responses.map((response) => response.json()));
-        meals.forEach((meal) => insertMealFromServer(meal));
+        savedMeals.forEach(({ meal }) => insertMealFromServer(meal));
+
+        if (failedResult) {
+          if (savedMeals.length > 0) {
+            throw new Error(`已添加 ${savedMeals.length} 项，另有 ${results.length - savedMeals.length} 项保存失败。`);
+          }
+
+          throw new Error(failedResult.error);
+        }
       } else {
         applyMealTemplate(templateId);
       }
@@ -331,12 +379,12 @@ export function AddFoodScreen({
         variant: "error"
       });
     } finally {
-      setSubmitting(false);
+      setApplyingTemplateId(null);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 safe-px pb-32 pt-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 safe-px pb-44 pt-6">
       <section className="space-y-3">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-muted-foreground">添加到 {mealTypeLabels[mealType]}</p>
@@ -365,22 +413,42 @@ export function AddFoodScreen({
         }}
       />
 
+      <Link
+        href="/settings#food-library"
+        className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_16px_35px_rgba(22,163,74,0.2)] lg:hidden"
+      >
+        <Plus className="h-4 w-4" />
+        添加自定义食物
+      </Link>
+
       {matchingTemplates.length > 0 ? (
         <section className="space-y-3">
           <SectionTitle title="饮食模板" />
           <div className="flex gap-3 overflow-x-auto pb-1">
             {matchingTemplates.map((template) => (
-              <button
+              <div
                 key={template.id}
-                type="button"
-                onClick={() => quickApplyTemplate(template.id, template.name)}
-                className="min-w-[13rem] rounded-[1.4rem] bg-white/72 px-4 py-4 text-left shadow-sm ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5"
+                className="min-w-[13rem] rounded-[1.4rem] bg-white/72 px-4 py-4 shadow-sm ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5"
               >
-                <p className="font-semibold">{template.name}</p>
+                <p className="truncate font-semibold">{template.name}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {template.items.length} 个食物 · {Math.round(summarizeTemplateItems(template.items).calories)} kcal
                 </p>
-              </button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-3 w-full rounded-full"
+                  disabled={actionBusy}
+                  onClick={() => void quickApplyTemplate(template.id, template.name)}
+                >
+                  {applyingTemplateId === template.id ? (
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-2 h-4 w-4" />
+                  )}
+                  应用模板
+                </Button>
+              </div>
             ))}
           </div>
         </section>
@@ -396,10 +464,11 @@ export function AddFoodScreen({
                 type="button"
                 onClick={() => setSelectedFoodId(food.id)}
                 className={cn(
-                  "min-w-[9rem] rounded-[1.4rem] bg-white/72 px-4 py-4 text-left shadow-sm ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5",
+                  "min-w-[10rem] rounded-[1.4rem] bg-white/72 p-3 text-left shadow-sm ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5",
                   selectedFoodId === food.id && "ring-2 ring-primary"
                 )}
               >
+                <FoodImage food={food} className="mb-3 h-20 rounded-[1.05rem]" />
                 <p className="font-semibold">{food.nameZh}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{Math.round(food.caloriesPer100g)} kcal / 100g</p>
               </button>
@@ -442,16 +511,17 @@ export function AddFoodScreen({
               type="button"
               onClick={() => setSelectedFoodId(food.id)}
               className={cn(
-                "rounded-[1.5rem] bg-white/72 px-4 py-4 text-left shadow-sm ring-1 ring-black/5 transition-all dark:bg-white/5 dark:ring-white/5",
+                "flex items-center gap-3 rounded-[1.5rem] bg-white/72 p-3 text-left shadow-sm ring-1 ring-black/5 transition-all dark:bg-white/5 dark:ring-white/5",
                 selectedFoodId === food.id && "ring-2 ring-primary"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{food.nameZh}</p>
+              <FoodImage food={food} className="h-16 w-16 shrink-0 rounded-[1.05rem]" />
+              <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{food.nameZh}</p>
                   <p className="text-xs text-muted-foreground">{foodCategoryLabels[food.category]}</p>
                 </div>
-                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
+                <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
                   {Math.round(food.caloriesPer100g)} kcal/100g
                 </span>
               </div>
@@ -467,12 +537,39 @@ export function AddFoodScreen({
 
       {basket.length > 0 ? (
         <section className="space-y-3 rounded-[1.75rem] bg-white/72 p-4 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5">
-          <SectionTitle title="当前模板组合" />
+          <div className="flex items-center justify-between gap-3">
+            <SectionTitle title="当前模板组合" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 rounded-full text-muted-foreground hover:text-destructive"
+              disabled={savingTemplate}
+              onClick={clearBasket}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              清空组合
+            </Button>
+          </div>
           <div className="space-y-2">
             {basket.map((item, index) => (
-              <div key={`${item.foodItemId}-${index}`} className="flex items-center justify-between rounded-2xl bg-secondary/70 px-3 py-3 text-sm">
-                <span>{item.nameZh}</span>
-                <span className="text-muted-foreground">{item.quantityGrams}g</span>
+              <div
+                key={`${item.foodItemId}-${index}`}
+                className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-2xl bg-secondary/70 px-3 py-3 text-sm"
+              >
+                <span className="truncate font-medium">{item.nameZh}</span>
+                <span className="whitespace-nowrap text-muted-foreground">{item.quantityGrams}g</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-destructive"
+                  disabled={savingTemplate}
+                  onClick={() => removeBasketItem(index)}
+                  aria-label={`移除${item.nameZh}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
@@ -483,9 +580,17 @@ export function AddFoodScreen({
               placeholder="例如：我的早餐模板"
               className="h-11 rounded-[1.2rem]"
             />
-            <Button className="rounded-[1.2rem]" onClick={() => void saveCurrentTemplate()}>
-              <BookmarkPlus className="mr-2 h-4 w-4" />
-              保存模板
+            <Button
+              className="rounded-[1.2rem]"
+              onClick={() => void saveCurrentTemplate()}
+              disabled={actionBusy || basket.length === 0 || !templateName.trim()}
+            >
+              {savingTemplate ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <BookmarkPlus className="mr-2 h-4 w-4" />
+              )}
+              {savingTemplate ? "保存中" : "保存模板"}
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -495,41 +600,46 @@ export function AddFoodScreen({
       ) : null}
 
       {selectedFood ? (
-        <section className="sticky bottom-24 space-y-4 rounded-[1.8rem] bg-white/92 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-white/80 backdrop-blur-xl dark:bg-slate-900/88 dark:ring-white/5">
+        <section className="sticky bottom-32 space-y-3 rounded-[1.8rem] bg-white/92 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] ring-1 ring-white/80 backdrop-blur-xl dark:bg-slate-900/88 dark:ring-white/5 sm:space-y-4 sm:p-5">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">{scannedFood?.id === selectedFood.id ? "扫码识别结果" : "已选择"}</p>
-              <h2 className="text-xl font-semibold">{selectedFood.nameZh}</h2>
+            <div className="flex min-w-0 items-center gap-3">
+              <FoodImage food={selectedFood} className="h-16 w-16 shrink-0 rounded-[1.1rem] sm:h-20 sm:w-20 sm:rounded-[1.25rem]" />
+              <div className="min-w-0">
+                <p className="text-sm text-muted-foreground">{scannedFood?.id === selectedFood.id ? "扫码识别结果" : "已选择"}</p>
+                <h2 className="truncate text-xl font-semibold">{selectedFood.nameZh}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{foodCategoryLabels[selectedFood.category]}</p>
+              </div>
             </div>
-            <p className="rounded-full bg-secondary px-3 py-1 text-sm font-semibold">{quantity[0]}g</p>
+            <p className="shrink-0 rounded-full bg-secondary px-3 py-1 text-sm font-semibold">{quantity[0]}g</p>
           </div>
           <div className="space-y-3">
             <Slider value={quantity} min={20} max={500} step={10} onValueChange={setQuantity} />
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-2xl bg-secondary p-3">
-                <p className="text-xs text-muted-foreground">热量</p>
-                <p className="mt-1 font-semibold">{Math.round(macroPreview.calories)} kcal</p>
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
+              <div className="rounded-2xl bg-secondary p-2 sm:p-3">
+                <p className="text-[11px] text-muted-foreground sm:text-xs">热量</p>
+                <p className="mt-1 whitespace-nowrap text-[13px] font-semibold sm:text-base">{Math.round(macroPreview.calories)} kcal</p>
               </div>
-              <div className="rounded-2xl bg-secondary p-3">
-                <p className="text-xs text-muted-foreground">蛋白质</p>
-                <p className="mt-1 font-semibold">{Math.round(macroPreview.protein)}g</p>
+              <div className="rounded-2xl bg-secondary p-2 sm:p-3">
+                <p className="text-[11px] text-muted-foreground sm:text-xs">蛋白质</p>
+                <p className="mt-1 whitespace-nowrap text-[13px] font-semibold sm:text-base">{Math.round(macroPreview.protein)}g</p>
               </div>
-              <div className="rounded-2xl bg-secondary p-3">
-                <p className="text-xs text-muted-foreground">脂肪</p>
-                <p className="mt-1 font-semibold">{Math.round(macroPreview.fat)}g</p>
+              <div className="rounded-2xl bg-secondary p-2 sm:p-3">
+                <p className="text-[11px] text-muted-foreground sm:text-xs">脂肪</p>
+                <p className="mt-1 whitespace-nowrap text-[13px] font-semibold sm:text-base">{Math.round(macroPreview.fat)}g</p>
               </div>
-              <div className="rounded-2xl bg-secondary p-3">
-                <p className="text-xs text-muted-foreground">碳水</p>
-                <p className="mt-1 font-semibold">{Math.round(macroPreview.carbs)}g</p>
+              <div className="rounded-2xl bg-secondary p-2 sm:p-3">
+                <p className="text-[11px] text-muted-foreground sm:text-xs">碳水</p>
+                <p className="mt-1 whitespace-nowrap text-[13px] font-semibold sm:text-base">{Math.round(macroPreview.carbs)}g</p>
               </div>
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Button variant="outline" className="h-12 rounded-[1.3rem]" onClick={addToBasket} disabled={submitting}>
+            <Button variant="outline" className="h-11 rounded-[1.3rem] text-sm sm:h-12" onClick={addToBasket} disabled={actionBusy}>
               加入模板组合
             </Button>
-            <Button className="h-12 rounded-[1.3rem]" onClick={() => void submitMeal()} disabled={submitting}>
-              {submitting ? "保存中…" : `添加到${mealTypeLabels[mealType]}`}
+            <Button className="h-11 rounded-[1.3rem] text-sm sm:h-12" onClick={() => void submitMeal()} disabled={actionBusy}>
+              {submitting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {submitting ? "保存中" : `添加到${mealTypeLabels[mealType]}`}
             </Button>
           </div>
         </section>
@@ -537,7 +647,7 @@ export function AddFoodScreen({
 
       <Link
         href="/settings#food-library"
-        className="fixed bottom-28 right-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_16px_35px_rgba(22,163,74,0.28)]"
+        className="fixed bottom-28 right-5 hidden items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_16px_35px_rgba(22,163,74,0.28)] lg:inline-flex"
       >
         <Plus className="h-4 w-4" />
         添加自定义食物

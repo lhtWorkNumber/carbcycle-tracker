@@ -247,7 +247,12 @@
 - [ ] 配置业务域名
 - [ ] 配置请求合法域名
 - [ ] 配置上传域名 / 下载域名（如果有）
-- [ ] 配置隐私政策与个人信息说明
+- [ ] 配置隐私政策与个人信息说明，草案见：
+  - [隐私政策草案](./privacy-policy-draft.md)
+  - [用户协议草案](./terms-of-service-draft.md)
+  - [个人信息收集说明草案](./personal-information-collection-list.md)
+  - [第三方服务说明草案](./third-party-services.md)
+- [ ] 按 [小程序提审材料清单](./miniapp-submission-materials.md) 准备截图、测试账号和审核备注
 
 #### 小程序前端壳
 
@@ -514,19 +519,26 @@
 
 ---
 
-## 13. 后续文件建议
+## 13. 发布材料索引
 
-建议你后面继续配套补这些文档：
+当前已经配套准备这些发布材料：
 
-- `docs/backend-api-roadmap.md`
 - `docs/auth-plan.md`
 - `docs/wechat-webview-checklist.md`
-- `docs/taro-migration-plan.md`
 - `docs/release-checklist.md`
+- [`docs/privacy-policy-draft.md`](./privacy-policy-draft.md)
+- [`docs/terms-of-service-draft.md`](./terms-of-service-draft.md)
+- [`docs/personal-information-collection-list.md`](./personal-information-collection-list.md)
+- [`docs/third-party-services.md`](./third-party-services.md)
+- [`docs/miniapp-submission-materials.md`](./miniapp-submission-materials.md)
+
+后续如果继续拆细技术路线，可再补：
+
+- `docs/backend-api-roadmap.md`
+- `docs/taro-migration-plan.md`
 
 ---
 
 ## 14. 一句话建议
 
 > 先把 Web 版做成真正可运营的产品，再用微信小程序 `web-view` 快速进入微信生态；只有当产品验证通过，再投入做原生小程序，回报最高。
-

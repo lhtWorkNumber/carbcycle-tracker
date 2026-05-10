@@ -3,16 +3,18 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, Droplets, Ruler, Salad, Sparkles, Zap } from "lucide-react";
+import { Download, Droplets, LoaderCircle, Ruler, Salad, Sparkles, Zap } from "lucide-react";
 
 import { AuthSessionCard } from "@/components/auth/auth-session-card";
 import { AchievementBadges } from "@/components/tracker/achievement-badges";
+import { FoodImage } from "@/components/tracker/food-image";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { UnitInput } from "@/components/ui/unit-input";
 import { SectionTitle } from "@/components/tracker/section-title";
 import { useToast } from "@/hooks/use-toast";
+import { calculateBMR, calculateTDEE, generateCarbCyclingPlan } from "@/lib/calculator";
 import {
   ActivityLevel,
   FoodCategory,
@@ -21,6 +23,7 @@ import {
   type UserProfile
 } from "@/lib/domain";
 import { onboardingTrainingDayLabels } from "@/lib/demo-data";
+import { getWeekDateKeys } from "@/lib/format";
 import { activityLevelLabels, foodCategoryLabels, goalLabels } from "@/lib/ui-config";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
@@ -32,13 +35,23 @@ const managementCategories = [
   FoodCategory.VEGETABLE,
   FoodCategory.FRUIT,
   FoodCategory.DAIRY,
-  FoodCategory.SNACK
+  FoodCategory.SNACK,
+  FoodCategory.BEVERAGE,
+  FoodCategory.OTHER
 ] as const;
+
+function parseNumberField(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? Number(trimmed) : Number.NaN;
+}
+
+function numberFromPayload(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
 
 export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: FoodItemSummary[] }) {
   const profile = useTrackerStore((state) => state.profile);
   const completeOnboarding = useTrackerStore((state) => state.completeOnboarding);
-  const regeneratePlan = useTrackerStore((state) => state.regeneratePlan);
   const theme = useTrackerStore((state) => state.theme);
   const setTheme = useTrackerStore((state) => state.setTheme);
   const achievements = useTrackerStore((state) => state.achievements);
@@ -55,6 +68,9 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
   const [draft, setDraft] = useState<UserProfile>(profile);
   const [customFoods, setCustomFoods] = useState(initialCustomFoods);
   const [message, setMessage] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingWaterTarget, setIsSavingWaterTarget] = useState(false);
+  const [waterTargetDraft, setWaterTargetDraft] = useState("");
   const [isSavingCustomFood, setIsSavingCustomFood] = useState(false);
   const [customFoodForm, setCustomFoodForm] = useState<{
     nameZh: string;
@@ -86,8 +102,135 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
     amountMl: 0,
     entries: []
   };
+  const nextWaterTarget = Number(waterTargetDraft);
+  const canSaveWaterTarget =
+    Number.isInteger(nextWaterTarget) &&
+    nextWaterTarget >= 500 &&
+    nextWaterTarget <= 10000 &&
+    nextWaterTarget !== todayWaterLog.targetMl;
+  const customFoodName = customFoodForm.nameZh.trim();
+  const customFoodValues = {
+    caloriesPer100g: parseNumberField(customFoodForm.caloriesPer100g),
+    proteinPer100g: parseNumberField(customFoodForm.proteinPer100g),
+    fatPer100g: parseNumberField(customFoodForm.fatPer100g),
+    carbsPer100g: parseNumberField(customFoodForm.carbsPer100g),
+    fiberPer100g: parseNumberField(customFoodForm.fiberPer100g)
+  };
+  const canSaveCustomFood =
+    customFoodName.length > 0 &&
+    customFoodValues.caloriesPer100g >= 0 &&
+    customFoodValues.caloriesPer100g <= 1000 &&
+    customFoodValues.proteinPer100g >= 0 &&
+    customFoodValues.proteinPer100g <= 100 &&
+    customFoodValues.fatPer100g >= 0 &&
+    customFoodValues.fatPer100g <= 100 &&
+    customFoodValues.carbsPer100g >= 0 &&
+    customFoodValues.carbsPer100g <= 100 &&
+    customFoodValues.fiberPer100g >= 0 &&
+    customFoodValues.fiberPer100g <= 100;
 
-  async function updateWaterTarget(targetMl: number) {
+  useEffect(() => {
+    setWaterTargetDraft(String(todayWaterLog.targetMl));
+  }, [todayWaterLog.targetMl, selectedDate]);
+
+  async function saveProfile(successTitle = "资料已更新") {
+    setIsSavingProfile(true);
+
+    try {
+      if (isAuthConfigured && !authUser) {
+        toast({
+          title: "请先登录",
+          description: "登录后才能把个人资料保存到正式账号。",
+          variant: "error"
+        });
+        return;
+      }
+
+      const nextBmr = calculateBMR(draft.gender, draft.age, draft.weightKg, draft.heightCm);
+      const nextTdee = calculateTDEE(nextBmr, draft.activityLevel);
+      const nextWeeklyPlan = generateCarbCyclingPlan(nextTdee, draft.goal, draft.trainingDays, draft.weightKg);
+
+      if (isAuthConfigured && authUser) {
+        const profileResponse = await fetch("/api/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: draft.name,
+            gender: draft.gender,
+            age: draft.age,
+            height: draft.heightCm,
+            weight: draft.weightKg,
+            body_fat_percentage: draft.bodyFatPercentage ?? null,
+            training_days: draft.trainingDays,
+            activity_level: draft.activityLevel,
+            goal: draft.goal
+          })
+        });
+
+        if (!profileResponse.ok) {
+          const payload = await profileResponse.json().catch(() => null);
+          throw new Error(payload?.error ?? "保存用户资料失败");
+        }
+
+        const weekDates = getWeekDateKeys(selectedDate);
+        const planResponse = await fetch("/api/daily-plans", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            plans: nextWeeklyPlan.days.map((day, index) => ({
+              date: new Date(`${weekDates[index]}T12:00:00.000Z`).toISOString(),
+              day_type: day.dayType,
+              target_calories: day.targetCalories,
+              target_protein_g: day.targetProteinG,
+              target_fat_g: day.targetFatG,
+              target_carbs_g: day.targetCarbsG,
+              actual_calories: 0,
+              actual_protein_g: 0,
+              actual_fat_g: 0,
+              actual_carbs_g: 0
+            }))
+          })
+        });
+
+        if (!planResponse.ok) {
+          const payload = await planResponse.json().catch(() => null);
+          throw new Error(payload?.error ?? "同步每日计划失败");
+        }
+      }
+
+      completeOnboarding(draft);
+      toast({
+        title: successTitle,
+        description: isAuthConfigured ? "新的基础信息和周计划已经保存到账号。" : "新的基础信息和周计划已经保存到本地。",
+        variant: "success"
+      });
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: error instanceof Error ? error.message : "请稍后再试。",
+        variant: "error"
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  async function saveWaterTarget() {
+    if (!canSaveWaterTarget) {
+      toast({
+        title: "请检查饮水目标",
+        description: "目标需要是 500 到 10000 ml 之间的整数。",
+        variant: "error"
+      });
+      return;
+    }
+
+    setIsSavingWaterTarget(true);
+
     if (isAuthConfigured && authUser) {
       try {
         const response = await fetch("/api/water-logs", {
@@ -97,7 +240,7 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
           },
           body: JSON.stringify({
             date: new Date(`${selectedDate}T12:00:00.000Z`).toISOString(),
-            targetMl,
+            targetMl: nextWaterTarget,
             amountMl: todayWaterLog.amountMl,
             entries: todayWaterLog.entries
           })
@@ -110,21 +253,50 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
 
         const savedLog = await response.json();
         upsertWaterLogFromServer(savedLog);
+        toast({
+          title: "饮水目标已保存",
+          description: `今日目标已调整为 ${nextWaterTarget}ml。`,
+          variant: "success"
+        });
       } catch (error) {
         toast({
           title: "保存失败",
           description: error instanceof Error ? error.message : "请稍后再试。",
           variant: "error"
         });
+      } finally {
+        setIsSavingWaterTarget(false);
       }
       return;
     }
 
-    setWaterTarget(targetMl);
+    setWaterTarget(nextWaterTarget);
+    setIsSavingWaterTarget(false);
+    toast({
+      title: "饮水目标已保存",
+      description: `今日目标已调整为 ${nextWaterTarget}ml。`,
+      variant: "success"
+    });
   }
 
   async function createCustomFood() {
+    if (isSavingCustomFood) {
+      return;
+    }
+
     setMessage("");
+
+    if (!canSaveCustomFood) {
+      const errorMessage = "请填写食物名称，并确认每 100g 营养数值有效。";
+      setMessage(errorMessage);
+      toast({
+        title: "请检查食物信息",
+        description: errorMessage,
+        variant: "error"
+      });
+      return;
+    }
+
     setIsSavingCustomFood(true);
 
     try {
@@ -134,14 +306,14 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          name: customFoodForm.nameZh,
-          name_zh: customFoodForm.nameZh,
+          name: customFoodName,
+          name_zh: customFoodName,
           category: customFoodForm.category,
-          calories_per_100g: Number(customFoodForm.caloriesPer100g),
-          protein_per_100g: Number(customFoodForm.proteinPer100g),
-          fat_per_100g: Number(customFoodForm.fatPer100g),
-          carbs_per_100g: Number(customFoodForm.carbsPer100g),
-          fiber_per_100g: Number(customFoodForm.fiberPer100g),
+          calories_per_100g: customFoodValues.caloriesPer100g,
+          protein_per_100g: customFoodValues.proteinPer100g,
+          fat_per_100g: customFoodValues.fatPer100g,
+          carbs_per_100g: customFoodValues.carbsPer100g,
+          fiber_per_100g: customFoodValues.fiberPer100g,
           gi_index: null,
           image_url: null,
           is_custom: true
@@ -149,26 +321,33 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
       });
 
       if (!response.ok) {
-        throw new Error("保存失败，请检查字段后重试。");
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "保存失败，请检查字段后重试。");
       }
 
-      const createdFood = await response.json();
+      const createdFood = (await response.json()) as Record<string, unknown>;
+      const createdFoodSummary: FoodItemSummary = {
+        id: numberFromPayload(createdFood.id, Date.now()),
+        name: typeof createdFood.name === "string" ? createdFood.name : customFoodName,
+        nameZh: typeof createdFood.name_zh === "string" ? createdFood.name_zh : typeof createdFood.nameZh === "string" ? createdFood.nameZh : customFoodName,
+        category: (createdFood.category ?? customFoodForm.category) as FoodCategory,
+        caloriesPer100g: numberFromPayload(createdFood.calories_per_100g ?? createdFood.caloriesPer100g, customFoodValues.caloriesPer100g),
+        proteinPer100g: numberFromPayload(createdFood.protein_per_100g ?? createdFood.proteinPer100g, customFoodValues.proteinPer100g),
+        fatPer100g: numberFromPayload(createdFood.fat_per_100g ?? createdFood.fatPer100g, customFoodValues.fatPer100g),
+        carbsPer100g: numberFromPayload(createdFood.carbs_per_100g ?? createdFood.carbsPer100g, customFoodValues.carbsPer100g),
+        fiberPer100g: numberFromPayload(createdFood.fiber_per_100g ?? createdFood.fiberPer100g, customFoodValues.fiberPer100g),
+        giIndex: numberFromPayload(createdFood.gi_index ?? createdFood.giIndex, 0) || null,
+        imageUrl:
+          typeof createdFood.image_url === "string"
+            ? createdFood.image_url
+            : typeof createdFood.imageUrl === "string"
+              ? createdFood.imageUrl
+              : null,
+        isCustom: typeof createdFood.is_custom === "boolean" ? createdFood.is_custom : typeof createdFood.isCustom === "boolean" ? createdFood.isCustom : true
+      };
 
       setCustomFoods((current) => [
-        {
-          id: createdFood.id,
-          name: createdFood.name,
-          nameZh: createdFood.name_zh,
-          category: createdFood.category,
-          caloriesPer100g: createdFood.calories_per_100g,
-          proteinPer100g: createdFood.protein_per_100g,
-          fatPer100g: createdFood.fat_per_100g,
-          carbsPer100g: createdFood.carbs_per_100g,
-          fiberPer100g: createdFood.fiber_per_100g,
-          giIndex: createdFood.gi_index,
-          imageUrl: createdFood.image_url,
-          isCustom: createdFood.is_custom
-        },
+        createdFoodSummary,
         ...current
       ]);
       setCustomFoodForm({
@@ -239,7 +418,8 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
     link.href = url;
     link.download = "carbcycle-tracker-export.csv";
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
     toast({
       title: "导出完成",
       description: "CSV 数据已经准备好。",
@@ -334,32 +514,28 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
           <div className="flex flex-wrap gap-3">
             <Button
               className="rounded-full"
-              onClick={() => {
-                completeOnboarding(draft);
-                toast({
-                  title: "资料已更新",
-                  description: "新的基础信息和周计划已经保存。",
-                  variant: "success"
-                });
-              }}
+              onClick={() => void saveProfile()}
+              disabled={isSavingProfile}
             >
-              <Sparkles className="mr-2 h-4 w-4" />
-              保存资料
+              {isSavingProfile ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              {isSavingProfile ? "保存中…" : "保存资料"}
             </Button>
             <Button
               variant="outline"
               className="rounded-full"
-              onClick={() => {
-                regeneratePlan();
-                toast({
-                  title: "计划已重算",
-                  description: "新的碳循环安排已经更新。",
-                  variant: "success"
-                });
-              }}
+              onClick={() => void saveProfile("计划已重算")}
+              disabled={isSavingProfile}
             >
-              <Zap className="mr-2 h-4 w-4" />
-              重新计算计划
+              {isSavingProfile ? (
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="mr-2 h-4 w-4" />
+              )}
+              {isSavingProfile ? "保存中…" : "重新计算计划"}
             </Button>
           </div>
         </div>
@@ -374,23 +550,35 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
               </div>
               <Switch checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} />
             </div>
-            <div className="mt-3 flex items-center justify-between rounded-[1.4rem] bg-secondary px-4 py-4">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] bg-secondary px-4 py-4">
               <div>
                 <p className="font-semibold">饮水目标</p>
                 <p className="text-sm text-muted-foreground">默认 2L，可按训练量调整</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <Droplets className="h-4 w-4 text-primary" />
                 <UnitInput
                   label="目标值"
                   unit="ml"
-                  value={String(todayWaterLog.targetMl)}
-                  onChange={(event) => void updateWaterTarget(Number(event.target.value) || 2000)}
+                  value={waterTargetDraft}
+                  onChange={(event) => setWaterTargetDraft(event.target.value)}
                   type="number"
                   inputMode="numeric"
-                  wrapperClassName="w-32"
+                  min={500}
+                  max={10000}
+                  step={100}
+                  wrapperClassName="w-32 min-w-0"
                   className="h-10 rounded-xl bg-background pr-10"
                 />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-10 rounded-xl px-3"
+                  disabled={!canSaveWaterTarget || isSavingWaterTarget}
+                  onClick={() => void saveWaterTarget()}
+                >
+                  {isSavingWaterTarget ? <LoaderCircle className="h-4 w-4 animate-spin" /> : "保存"}
+                </Button>
               </div>
             </div>
             <Button variant="outline" className="mt-4 w-full rounded-[1.3rem]" onClick={exportCsv}>
@@ -443,21 +631,31 @@ export function SettingsScreen({ initialCustomFoods }: { initialCustomFoods: Foo
           ))}
         </div>
         <Textarea value={customFoodForm.note} onChange={(event) => setCustomFoodForm((current) => ({ ...current, note: event.target.value }))} placeholder="备注：例如烹饪方式、品牌或包装规格" />
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">{message || "新食物会在添加食物页面即时可见。"}</p>
-          <Button className="rounded-full" onClick={() => void createCustomFood()} disabled={isSavingCustomFood}>
+          <Button className="w-full rounded-full sm:w-auto" onClick={() => void createCustomFood()} disabled={isSavingCustomFood || !canSaveCustomFood}>
+            {isSavingCustomFood ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
             {isSavingCustomFood ? "保存中…" : "保存自定义食物"}
           </Button>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {customFoods.map((food) => (
-            <div key={food.id} className="rounded-[1.4rem] bg-secondary/80 px-4 py-4">
-              <p className="font-semibold">{food.nameZh}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {foodCategoryLabels[food.category]} · {Math.round(food.caloriesPer100g)} kcal / 100g
-              </p>
+          {customFoods.length > 0 ? (
+            customFoods.map((food) => (
+              <div key={food.id} className="flex min-w-0 gap-3 rounded-[1.4rem] bg-secondary/80 p-3">
+                <FoodImage food={food} className="h-16 w-16 shrink-0 rounded-[1rem]" />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{food.nameZh}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {foodCategoryLabels[food.category]} · {Math.round(food.caloriesPer100g)} kcal / 100g
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-[1.4rem] border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+              还没有自定义食物，保存后会显示在这里。
             </div>
-          ))}
+          )}
         </div>
       </section>
     </div>

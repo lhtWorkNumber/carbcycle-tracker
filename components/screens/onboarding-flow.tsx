@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { UnitInput } from "@/components/ui/unit-input";
+import { LifestylePanel } from "@/components/visual/lifestyle-panel";
 import { useToast } from "@/hooks/use-toast";
 import { calculateBMR, calculateTDEE, generateCarbCyclingPlan } from "@/lib/calculator";
 import {
@@ -15,6 +16,7 @@ import {
   type UserProfile
 } from "@/lib/domain";
 import { onboardingTrainingDayLabels } from "@/lib/demo-data";
+import { onboardingVisualImage } from "@/lib/food-images";
 import { getWeekDateKeys } from "@/lib/format";
 import { activityLevelLabels, dayTypeMeta, goalLabels } from "@/lib/ui-config";
 import { cn } from "@/lib/utils";
@@ -171,6 +173,16 @@ export function OnboardingFlow() {
               这一步会为你计算基础代谢、总消耗，并生成一周的高碳 / 中碳 / 低碳安排。
             </p>
           </div>
+          <LifestylePanel
+            imageUrl={onboardingVisualImage}
+            eyebrow="PLAN"
+            title="把训练日和饮食目标配到同一周。"
+            metrics={[
+              { label: "训练日", value: `${form.trainingDays.length} 天` },
+              { label: "TDEE", value: `${Math.round(tdee)}` }
+            ]}
+            className="hidden lg:block"
+          />
           <div className="space-y-3 rounded-[2rem] bg-white/72 p-5 ring-1 ring-black/5 dark:bg-white/5 dark:ring-white/5">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium text-muted-foreground">

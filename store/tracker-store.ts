@@ -92,8 +92,11 @@ interface TrackerState {
   toggleTheme: () => void;
   addMeal: (meal: AddMealInput) => void;
   addMeals: (meals: AddMealInput[]) => void;
+  removeMeal: (mealId: string) => void;
   addBodyRecord: (record: AddBodyRecordInput) => void;
+  removeBodyRecord: (recordId: string) => void;
   addExercise: (exercise: AddExerciseInput) => void;
+  removeExercise: (exerciseId: string) => void;
   addWater: (amountMl: number, date?: string) => void;
   setWaterTarget: (targetMl: number, date?: string) => void;
   saveMealTemplate: (name: string, mealType: MealType, items: MealTemplateItem[]) => void;
@@ -489,7 +492,7 @@ export const useTrackerStore = create<TrackerState>()(
         }),
       hydrateWeeklySummariesFromServer: (weeklySummaries) =>
         set(() => ({
-          weeklySummaries
+          weeklySummaries: [...weeklySummaries].sort((left, right) => left.weekKey.localeCompare(right.weekKey))
         })),
       hydrateAchievementsFromServer: (achievements) =>
         set(() => ({
@@ -581,6 +584,23 @@ export const useTrackerStore = create<TrackerState>()(
             ...derived
           };
         }),
+      removeMeal: (mealId) =>
+        set((state) => {
+          const meals = state.meals.filter((meal) => meal.id !== mealId);
+          const derived = recalculateState({
+            bodyRecords: state.bodyRecords,
+            meals,
+            exercises: state.exercises,
+            waterLogs: state.waterLogs,
+            weeklyPlan: state.weeklyPlan
+          });
+
+          return {
+            meals,
+            recentFoodIds: Array.from(new Set(meals.map((meal) => meal.foodItemId))).slice(0, 12),
+            ...derived
+          };
+        }),
       addBodyRecord: (record) =>
         set((state) => {
           const bodyRecords = [
@@ -591,6 +611,22 @@ export const useTrackerStore = create<TrackerState>()(
             },
             ...state.bodyRecords
           ].sort((left, right) => left.date.localeCompare(right.date));
+          const derived = recalculateState({
+            bodyRecords,
+            meals: state.meals,
+            exercises: state.exercises,
+            waterLogs: state.waterLogs,
+            weeklyPlan: state.weeklyPlan
+          });
+
+          return {
+            bodyRecords,
+            ...derived
+          };
+        }),
+      removeBodyRecord: (recordId) =>
+        set((state) => {
+          const bodyRecords = state.bodyRecords.filter((record) => record.id !== recordId);
           const derived = recalculateState({
             bodyRecords,
             meals: state.meals,
@@ -627,14 +663,35 @@ export const useTrackerStore = create<TrackerState>()(
             ...derived
           };
         }),
+      removeExercise: (exerciseId) =>
+        set((state) => {
+          const exercises = state.exercises.filter((exercise) => exercise.id !== exerciseId);
+          const derived = recalculateState({
+            bodyRecords: state.bodyRecords,
+            meals: state.meals,
+            exercises,
+            waterLogs: state.waterLogs,
+            weeklyPlan: state.weeklyPlan
+          });
+
+          return {
+            exercises,
+            ...derived
+          };
+        }),
       addWater: (amountMl, date) =>
         set((state) => {
           const targetDate = date ?? state.selectedDate;
           const log = normalizeWaterLog(state.waterLogs, targetDate);
+          const nextAmount = Math.min(10000, Math.max(0, log.amountMl + amountMl));
+          const actualDelta = nextAmount - log.amountMl;
+          if (actualDelta === 0) {
+            return state;
+          }
           const updatedLog: WaterLog = {
             ...log,
-            amountMl: log.amountMl + amountMl,
-            entries: [...log.entries, amountMl]
+            amountMl: nextAmount,
+            entries: [...log.entries, actualDelta]
           };
           const waterLogs = [
             updatedLog,

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Dumbbell, Flame, Ruler, Sparkles } from "lucide-react";
 
 import { calculateDailyProgress, calculateRemainingMacros, type WeeklyPlanDay } from "@/lib/calculator";
@@ -17,8 +18,14 @@ import { SmartSuggestion } from "@/components/tracker/smart-suggestion";
 import { WaterTracker } from "@/components/tracker/water-tracker";
 import { WeeklyStrip } from "@/components/tracker/weekly-strip";
 import { WeeklySummaryCard } from "@/components/tracker/weekly-summary-card";
+import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/store/auth-store";
 
 const mealOrder = [MealType.BREAKFAST, MealType.LUNCH, MealType.DINNER, MealType.SNACK] as const;
+
+function isServerMealId(mealId: string) {
+  return mealId.startsWith("meal-log-");
+}
 
 function toDailyPlan(todayPlan: WeeklyPlanDay): DailyPlan {
   return {
@@ -31,13 +38,18 @@ function toDailyPlan(todayPlan: WeeklyPlanDay): DailyPlan {
 }
 
 export function DashboardScreen() {
+  const { toast } = useToast();
   const selectedDate = useTrackerStore((state) => state.selectedDate);
   const weeklyPlan = useTrackerStore((state) => state.weeklyPlan);
   const meals = useTrackerStore((state) => state.meals);
+  const removeMeal = useTrackerStore((state) => state.removeMeal);
   const profile = useTrackerStore((state) => state.profile);
   const hasCompletedOnboarding = useTrackerStore((state) => state.hasCompletedOnboarding);
   const dailyCheckInStreak = useTrackerStore((state) => state.dailyCheckInStreak);
   const weeklySummaries = useTrackerStore((state) => state.weeklySummaries);
+  const authUser = useAuthStore((state) => state.user);
+  const isAuthConfigured = useAuthStore((state) => state.isConfigured);
+  const [deletingMealId, setDeletingMealId] = useState<string | null>(null);
 
   const activeDayIndex = getMondayFirstDayIndex(selectedDate);
   const todayPlan = weeklyPlan.days[activeDayIndex] ?? weeklyPlan.days[0];
@@ -48,6 +60,38 @@ export function DashboardScreen() {
   const remainingMacros = calculateRemainingMacros(dailyProgress);
   const remainingCalories = Math.round(dailyProgress.calories.target - dailyProgress.calories.actual);
   const latestWeeklySummary = weeklySummaries.at(-1);
+
+  async function deleteMeal(mealId: string) {
+    setDeletingMealId(mealId);
+
+    try {
+      if (isAuthConfigured && authUser && isServerMealId(mealId)) {
+        const response = await fetch(`/api/meal-logs?id=${encodeURIComponent(mealId)}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error ?? "删除餐食记录失败");
+        }
+      }
+
+      removeMeal(mealId);
+      toast({
+        title: "餐食记录已删除",
+        description: "今日宏量统计已经同步更新。",
+        variant: "success"
+      });
+    } catch (error) {
+      toast({
+        title: "删除失败",
+        description: error instanceof Error ? error.message : "请稍后再试。",
+        variant: "error"
+      });
+    } finally {
+      setDeletingMealId(null);
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-5 safe-px pb-28 pt-6">
@@ -145,6 +189,8 @@ export function DashboardScreen() {
               key={mealType}
               mealType={mealType}
               meals={todayMeals.filter((meal) => meal.mealType === mealType)}
+              deletingMealId={deletingMealId}
+              onDeleteMeal={(mealId) => void deleteMeal(mealId)}
             />
           ))}
         </div>

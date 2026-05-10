@@ -36,6 +36,58 @@ export async function parseJsonBody<T>(request: NextRequest, schema: ZodSchema<T
   };
 }
 
+export function parseNumericResourceId(value: string | null, prefix: string) {
+  if (!value?.startsWith(prefix)) {
+    return null;
+  }
+
+  const numericId = Number(value.slice(prefix.length));
+  return Number.isInteger(numericId) && numericId > 0 ? numericId : null;
+}
+
+export function parseJsonValue<T>(
+  value: string | null | undefined,
+  fallback: T,
+  isExpectedValue?: (parsed: unknown) => parsed is T
+): T {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!isExpectedValue) {
+      return parsed as T;
+    }
+
+    return isExpectedValue(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseJsonArray<T>(
+  value: string | null | undefined,
+  fallback: T[] = [],
+  isExpectedItem?: (item: unknown) => item is T
+): T[] {
+  const parsed = parseJsonValue<unknown[]>(value, fallback, Array.isArray);
+
+  if (!isExpectedItem) {
+    return parsed as T[];
+  }
+
+  return parsed.every(isExpectedItem) ? parsed : fallback;
+}
+
+export function parseOptionalJsonObject<T extends object>(value: string | null | undefined): T | undefined {
+  return parseJsonValue<T | undefined>(
+    value,
+    undefined,
+    (parsed): parsed is T => typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+  );
+}
+
 export async function withObservedApiRoute(
   request: NextRequest,
   route: string,

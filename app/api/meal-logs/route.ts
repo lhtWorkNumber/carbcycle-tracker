@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { parseJsonBody, withObservedApiRoute } from "@/lib/api";
+import { parseJsonBody, parseNumericResourceId, withObservedApiRoute } from "@/lib/api";
 import { calculateFoodItemMacros } from "@/lib/calculator";
 import { formatDateKey } from "@/lib/format";
+import { getCurrentDbUserContext } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
 import { createRateLimitResponse, rateLimit, withRateLimitHeaders } from "@/lib/rate-limit";
-import { getCurrentAuthUser } from "@/lib/supabase/server";
 import { createMealLogSchema } from "@/lib/validation";
 
 function normalizeMealLog(mealLog: {
@@ -60,24 +60,17 @@ export async function GET(request: NextRequest) {
       return createRateLimitResponse(limit);
     }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      auth_user_id: authUser.id
-    },
-    select: {
-      id: true
-    }
-  });
-
-  if (!user) {
+  if (userContext.status === "missing_profile") {
     return withRateLimitHeaders(NextResponse.json([]), limit);
   }
+
+  const { user } = userContext;
 
   const mealLogs = await prisma.mealLog.findMany({
     where: {
@@ -107,26 +100,42 @@ export async function POST(request: NextRequest) {
     return withRateLimitHeaders(parsed.response, limit);
   }
 
-  const authUser = await getCurrentAuthUser();
+  const userContext = await getCurrentDbUserContext();
 
-  if (!authUser) {
+  if (userContext.status === "unauthenticated") {
     return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
   }
 
-  const user = await prisma.user.findUnique({
+  if (userContext.status === "missing_profile") {
+    return withRateLimitHeaders(
+      NextResponse.json({ error: "请先完成用户资料设置后再记录餐食。" }, { status: 409 }),
+      limit
+    );
+  }
+
+  const { user } = userContext;
+
+  const foodItem = await prisma.foodItem.findFirst({
     where: {
-      auth_user_id: authUser.id
+      id: parsed.data.food_item_id,
+      OR: [
+        {
+          is_custom: false,
+          user_id: null
+        },
+        {
+          is_custom: true,
+          user_id: user.id
+        }
+      ]
     },
     select: {
       id: true
     }
   });
 
-  if (!user) {
-    return withRateLimitHeaders(
-      NextResponse.json({ error: "请先完成用户资料设置后再记录餐食。" }, { status: 409 }),
-      limit
-    );
+  if (!foodItem) {
+    return withRateLimitHeaders(NextResponse.json({ error: "没有找到这个食物。" }, { status: 404 }), limit);
   }
 
   const mealLog = await prisma.mealLog.create({
@@ -143,5 +152,46 @@ export async function POST(request: NextRequest) {
   });
 
     return withRateLimitHeaders(NextResponse.json(normalizeMealLog(mealLog), { status: 201 }), limit);
+  });
+}
+
+export async function DELETE(request: NextRequest) {
+  return withObservedApiRoute(request, "/api/meal-logs", async () => {
+    const limit = rateLimit(request, { key: "meal-logs:delete", limit: 30, windowMs: 60_000 });
+
+    if (!limit.allowed) {
+      return createRateLimitResponse(limit);
+    }
+
+    const mealLogId = parseNumericResourceId(request.nextUrl.searchParams.get("id"), "meal-log-");
+
+    if (!mealLogId) {
+      return withRateLimitHeaders(NextResponse.json({ error: "缺少有效的餐食记录 ID。" }, { status: 400 }), limit);
+    }
+
+    const userContext = await getCurrentDbUserContext();
+
+    if (userContext.status === "unauthenticated") {
+      return withRateLimitHeaders(NextResponse.json({ error: "未登录" }, { status: 401 }), limit);
+    }
+
+    if (userContext.status === "missing_profile") {
+      return withRateLimitHeaders(NextResponse.json({ error: "请先完成用户资料设置。" }, { status: 409 }), limit);
+    }
+
+    const { user } = userContext;
+
+    const deleted = await prisma.mealLog.deleteMany({
+      where: {
+        id: mealLogId,
+        user_id: user.id
+      }
+    });
+
+    if (deleted.count === 0) {
+      return withRateLimitHeaders(NextResponse.json({ error: "没有找到这条餐食记录。" }, { status: 404 }), limit);
+    }
+
+    return withRateLimitHeaders(NextResponse.json({ ok: true }), limit);
   });
 }
