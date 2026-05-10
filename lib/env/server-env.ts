@@ -8,7 +8,9 @@ const productionSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   DATABASE_URL: z.string().startsWith("postgresql://").or(z.string().startsWith("postgres://")),
   DIRECT_URL: z.string().startsWith("postgresql://").or(z.string().startsWith("postgres://")),
-  PRISMA_SCHEMA_PATH: z.string().min(1)
+  PRISMA_SCHEMA_PATH: z.string().min(1),
+  WECHAT_MINIAPP_APP_ID: z.string().optional(),
+  WECHAT_MINIAPP_APP_SECRET: z.string().optional()
 });
 
 const developmentSchema = z.object({
@@ -19,7 +21,9 @@ const developmentSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1).default("placeholder-anon-key"),
   DATABASE_URL: z.string().min(1),
   DIRECT_URL: z.string().optional(),
-  PRISMA_SCHEMA_PATH: z.string().optional()
+  PRISMA_SCHEMA_PATH: z.string().optional(),
+  WECHAT_MINIAPP_APP_ID: z.string().optional(),
+  WECHAT_MINIAPP_APP_SECRET: z.string().optional()
 });
 
 function placeholderStrings() {
@@ -34,6 +38,10 @@ function containsPlaceholder(value: string | undefined) {
   return placeholderStrings().some((needle) => value.includes(needle));
 }
 
+function hasPartialWechatConfig(data: { WECHAT_MINIAPP_APP_ID?: string; WECHAT_MINIAPP_APP_SECRET?: string }) {
+  return Boolean(data.WECHAT_MINIAPP_APP_ID) !== Boolean(data.WECHAT_MINIAPP_APP_SECRET);
+}
+
 export function validateServerEnv(mode: "development" | "production") {
   const schema = mode === "production" ? productionSchema : developmentSchema;
   const parsed = schema.safeParse(process.env);
@@ -42,6 +50,13 @@ export function validateServerEnv(mode: "development" | "production") {
     return {
       success: false as const,
       message: parsed.error.flatten()
+    };
+  }
+
+  if (hasPartialWechatConfig(parsed.data)) {
+    return {
+      success: false as const,
+      message: "微信小程序配置不完整：WECHAT_MINIAPP_APP_ID 和 WECHAT_MINIAPP_APP_SECRET 需要同时配置。"
     };
   }
 

@@ -57,6 +57,7 @@
 - Prisma + Supabase PostgreSQL 生产部署
 - API 输入校验：Zod
 - API 基础限流：按 IP + 时间窗口
+- 用户身份：业务 `User` 与登录身份解耦，微信 / 手机号接入方案见 [`docs/user-identity-architecture.md`](./docs/user-identity-architecture.md)
 - Docker 化部署
 - Vercel 部署配置
 - GitHub Actions CI/CD

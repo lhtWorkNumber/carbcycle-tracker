@@ -59,6 +59,12 @@ enum ExerciseType {
   FLEXIBILITY
 }
 
+enum UserIdentityProvider {
+  SUPABASE
+  WECHAT_MINIAPP
+  PHONE
+}
+
 model User {
   id                  Int            @id @default(autoincrement())
   auth_user_id        String?        @unique
@@ -83,6 +89,25 @@ model User {
   weekly_summaries    WeeklySummary[]
   achievement_progress AchievementProgress[]
   food_items          FoodItem[]
+  identities          UserIdentity[]
+}
+
+model UserIdentity {
+  id               Int                  @id @default(autoincrement())
+  user_id          Int
+  provider         UserIdentityProvider
+  provider_user_id String
+  union_id         String?
+  app_id           String?
+  verified_at      DateTime?
+  raw_profile_json String?
+  created_at       DateTime             @default(now())
+  updated_at       DateTime             @updatedAt
+  user             User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, provider_user_id])
+  @@index([user_id, provider])
+  @@index([provider, union_id])
 }
 
 model FoodItem {

@@ -45,6 +45,8 @@
 - 手机号验证码
 - 微信登录
 
+微信小程序接入时不要把手机号作为默认注册前置。推荐先使用微信 `openid` / `unionid` 建立或绑定身份，手机号仅在用户主动授权后作为可选绑定。详细方案见 [用户体系与微信小程序接入方案](./user-identity-architecture.md)。
+
 ---
 
 ## 当前任务范围
@@ -107,6 +109,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 2. 用真实账号跑通 Magic Link 登录、引导资料入库和 shell 页面保护
 3. 部署到 Vercel 后验证 PostgreSQL 生产 schema、cookie 与回调域名
 4. 根据真实使用反馈决定是否追加手机号验证码、微信登录或原生小程序登录
+5. 接入微信前，先按 `UserIdentity` 身份绑定表统一 Supabase、微信和手机号三类身份，避免业务 `User` 表被登录方式绑死
 
 ---
 
